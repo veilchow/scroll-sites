@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#04060e">
+<meta name="description" content="ASTRA 深空信标计划 —— 滚动驱动的深空叙事：接近、对接并点亮一座失联百年的信标站。">
+<title>ASTRA · 深空信标计划 · 程序化引擎档案版</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%238fe8ff' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%23ffb45e'/%3E%3C/svg%3E">
+<link rel="preload" as="image" href="assets/approach.png">
+<style>
+  :root{
+    --cyan:#8fe8ff; --cyan-deep:#57b1ec; --warm:#ffb45e;
+    --ink:#e8f2ff; --mut:#8ea6c8; --bg:#04060e;
+    --mono:ui-monospace,"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{background:var(--bg)}
+  body{
+    background:var(--bg);color:var(--ink);overflow-x:hidden;
+    font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:rgba(80,180,255,.3)}
+  button{font:inherit;color:inherit;background:none;border:0}
+  button:focus-visible{outline:1px solid var(--cyan);outline-offset:2px}
+
+  /* ============ 滚动轨道（滚动条即播放器，总高约 7 屏） ============ */
+  #scroll-track{height:700vh;pointer-events:none}
+
+  /* ============ 固定舞台：铺满视口 ============ */
+  #stage{
+    position:fixed;inset:0;width:100vw;height:100vh;height:100svh;
+    overflow:hidden;background:var(--bg);z-index:1;
+  }
+  #poster{
+    position:absolute;inset:0;width:100%;height:100%;
+    object-fit:cover;object-position:50% 50%;display:block;
+  }
+
+  /* ============ 画面层：海报(底) < 视频 < fade/flash/HUD(顶) ============ */
+  #stage video{
+    position:absolute;inset:0;width:100%;height:100%;
+    object-fit:cover;object-position:50% 50%;
+    opacity:0;pointer-events:none;background:transparent;
+  }
+  #fade{
+    position:absolute;inset:0;background:#04060e;opacity:0;
+    transition:opacity .34s ease;pointer-events:none;z-index:5;
+  }
+  #fade.on{opacity:1}
+  .noscript{
+    position:fixed;inset:0;z-index:99;background:var(--bg);
+    display:flex;align-items:center;justify-content:center;
+    text-align:center;color:var(--mut);padding:24px;line-height:2;
+  }
+
+  /* ============ UI 通用 / 口播模式 ============ */
+  .ui{transition:opacity .35s ease}
+  body.ui-hidden .ui{opacity:0 !important;pointer-events:none !important}
+  body.ui-hidden{cursor:none}
+
+  /* ============ 顶栏：品牌 + 章节导航 ============ */
+  #topbar{
+    position:fixed;top:0;left:0;right:0;z-index:40;
+    display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:18px 26px;
+    background:linear-gradient(180deg,rgba(4,6,14,.6),rgba(4,6,14,0));
+    pointer-events:none;
+  }
+  .brand{display:flex;align-items:center;gap:12px;pointer-events:auto}
+  .logo{font-weight:700;font-size:15px;letter-spacing:.46em;color:#fff;
+    text-shadow:0 0 18px rgba(120,210,255,.35)}
+  .brand-sep{width:1px;height:14px;background:rgba(140,180,230,.35)}
+  .sub{font-size:11px;letter-spacing:.3em;color:var(--mut)}
+  #chapter-nav{display:flex;gap:4px;pointer-events:auto}
+  .nav-btn{
+    position:relative;cursor:pointer;
+    display:flex;align-items:baseline;gap:7px;padding:8px 12px;
+    color:var(--mut);letter-spacing:.14em;font-size:13px;
+    transition:color .3s ease;
+  }
+  .nav-btn .n{font-family:var(--mono);font-size:10px;color:rgba(120,160,210,.7)}
+  .nav-btn::after{
+    content:"";position:absolute;left:12px;right:12px;bottom:2px;height:1px;
+    background:linear-gradient(90deg,var(--cyan),transparent);
+    transform:scaleX(0);transform-origin:left;transition:transform .35s ease;
+  }
+  .nav-btn:hover{color:#cfe4ff}
+  .nav-btn.active{color:#fff}
+  .nav-btn.active::after{transform:scaleX(1)}
+  .nav-btn.active .n{color:var(--cyan)}
+
+  /* ============ 左侧章节大标题（网格堆叠 + JS 淡入淡出） ============ */
+  #titles{
+    position:fixed;left:6vw;top:0;bottom:0;z-index:30;pointer-events:none;
+    display:grid;align-content:center;
+    max-width:min(600px,78vw);
+  }
+  .title{grid-area:1/1;opacity:0;transform:translateY(18px)}
+  .t-kicker{
+    font-family:var(--mono);font-size:11px;letter-spacing:.4em;
+    color:var(--cyan);margin-bottom:16px;
+  }
+  .t-main{
+    font-size:clamp(26px,4.6vw,56px);font-weight:650;line-height:1.28;letter-spacing:.03em;
+    text-shadow:0 2px 34px rgba(4,8,22,.9);
+  }
+  .t-sub{
+    margin-top:16px;color:var(--mut);
+    font-size:clamp(12px,1.15vw,15px);line-height:1.9;letter-spacing:.05em;max-width:42ch;
+  }
+  body[data-chapter="3"] .t-kicker{color:var(--warm)}
+  /* 首屏 hero：品牌版式 + CTA（仅第一章，滚动后随标题窗一起淡出） */
+  .hero .t-main{font-size:clamp(30px,5.4vw,64px);font-weight:700}
+  .hero .t-sub{max-width:46ch}
+  .hero-cta{display:flex;gap:14px;margin-top:26px;flex-wrap:wrap}
+  .hero-cta button{
+    font-family:var(--mono);font-size:12px;letter-spacing:.18em;
+    padding:12px 20px;border-radius:999px;cursor:pointer;
+    color:var(--ink);background:rgba(8,14,32,.45);border:1px solid rgba(143,232,255,.45);
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    transition:border-color .3s,box-shadow .3s,transform .3s;
+  }
+  .hero-cta button .i{margin:0 8px 0 0;color:var(--cyan)}
+  .hero-cta button:last-child .i{margin:0 0 0 8px}
+  .hero-cta button:hover{border-color:var(--cyan);box-shadow:0 0 24px rgba(120,210,255,.25);transform:translateY(-1px)}
+  .hero-meta{margin-top:20px;font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--mut)}
+  body.reduced .title{transition:opacity .5s ease,transform .5s ease}
+  body.reduced .title.active{opacity:1;transform:none}
+
+  /* ============ 右侧竖向进度条（0–100%） ============ */
+  #progress{
+    position:fixed;right:24px;top:50%;transform:translateY(-50%);z-index:30;
+    display:flex;flex-direction:column;align-items:center;gap:12px;
+  }
+  .track{
+    position:relative;width:3px;height:38vh;cursor:pointer;
+    background:rgba(130,165,220,.16);border-radius:2px;
+  }
+  .track .tick{position:absolute;left:-4px;width:11px;height:1px;background:rgba(150,185,235,.4)}
+  #progress-fill{
+    position:absolute;top:0;left:0;width:100%;height:0%;border-radius:2px;
+    background:linear-gradient(180deg,#d8f2ff,#57b1ec);
+    box-shadow:0 0 10px rgba(110,200,255,.75);
+  }
+  #progress-head{
+    position:absolute;left:50%;top:0%;width:9px;height:9px;border-radius:50%;
+    transform:translate(-50%,-50%);background:#e7f6ff;
+    box-shadow:0 0 12px rgba(140,220,255,.95);
+  }
+  #progress-pct{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--mut)}
+
+  /* ============ 底部滚动提示（首次滚动后淡出） ============ */
+  #hint{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:30;
+    display:flex;flex-direction:column;align-items:center;gap:9px;
+    color:var(--mut);font-size:11px;letter-spacing:.34em;text-indent:.34em;
+  }
+  #hint.gone{opacity:0;pointer-events:none}
+  .mouse{width:20px;height:32px;border:1.5px solid rgba(160,195,235,.5);border-radius:10px;position:relative}
+  .wheel{
+    position:absolute;left:50%;top:5px;transform:translateX(-50%);
+    width:3px;height:6px;border-radius:2px;background:var(--cyan);
+    animation:hint-wheel 1.9s ease-in-out infinite;
+  }
+  @keyframes hint-wheel{0%{opacity:0;top:5px}30%{opacity:1}75%{opacity:0;top:17px}100%{opacity:0;top:17px}}
+
+  /* ============ 自动漫游按钮 ============ */
+  #tour-btn{
+    position:fixed;right:26px;bottom:24px;z-index:40;
+    display:flex;align-items:center;gap:9px;
+    background:rgba(9,14,30,.55);border:1px solid rgba(128,198,255,.28);border-radius:999px;
+    padding:10px 18px;cursor:pointer;
+    font-size:12px;letter-spacing:.16em;color:var(--ink);
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    transition:border-color .3s ease,box-shadow .3s ease;
+  }
+  #tour-btn:hover{border-color:rgba(150,220,255,.65);box-shadow:0 0 18px rgba(90,180,255,.25)}
+  #tour-ico{font-size:10px;color:var(--cyan)}
+
+  /* ============ P1 反馈层：计量 HUD（左下角，章集群互斥淡切） ============ */
+  #hud{
+    position:fixed;left:26px;bottom:24px;z-index:35;pointer-events:none;
+    display:grid;max-width:min(320px,72vw);
+  }
+  .hud-cluster{
+    grid-area:1/1;
+    background:rgba(6,10,24,.5);border:1px solid rgba(128,198,255,.20);border-radius:10px;
+    padding:12px 16px;
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    font-family:var(--mono);color:var(--ink);
+    opacity:0;transform:translateY(10px);
+    transition:opacity .3s ease,transform .3s ease;
+  }
+  .hud-cluster.on{opacity:1;transform:none}
+  body.reduced .hud-cluster{transition:opacity .5s ease}
+  .hud-cap{font-size:10px;letter-spacing:.32em;color:var(--mut);margin-bottom:6px}
+  .hud-big{display:flex;align-items:baseline;gap:8px;margin:2px 0 8px}
+  .hud-num{
+    display:inline-block;
+    font-size:clamp(28px,5vw,56px);font-weight:600;line-height:1;color:#eaf7ff;
+    text-shadow:0 0 22px rgba(120,210,255,.35);font-variant-numeric:tabular-nums;
+  }
+  .hud-unit{font-size:12px;color:var(--cyan);letter-spacing:.2em}
+  .hud-row{display:flex;align-items:center;gap:10px;font-size:11px;letter-spacing:.08em;margin-top:6px;color:var(--mut)}
+  .hud-row .v{margin-left:auto;color:var(--ink)}
+  .hud-row .v.sm{color:var(--mut)}
+  .bar{position:relative;width:86px;height:4px;background:rgba(130,165,220,.18);border-radius:2px;overflow:hidden;flex:none}
+  .bar i{position:absolute;left:0;top:0;bottom:0;width:0%;border-radius:2px;
+    background:linear-gradient(90deg,#57b1ec,#d8f2ff);box-shadow:0 0 8px rgba(110,200,255,.6)}
+  .bar.wide{width:100%;margin-top:8px;height:5px}
+  .hud-dot{width:7px;height:7px;border-radius:50%;background:#5a6b85;flex:none}
+  .hud-dot.docking{background:#ffd45e;box-shadow:0 0 10px rgba(255,212,94,.8);animation:dot-blink .5s steps(2) infinite}
+  .hud-dot.docked{background:#5eff9c;box-shadow:0 0 10px rgba(94,255,156,.75)}
+  @keyframes dot-blink{50%{opacity:.35}}
+  /* SEG3：打字机 + 同步率 */
+  #hud-type{font-size:12px;letter-spacing:.12em;color:#ffe9c9;margin-bottom:10px;min-height:1.7em}
+  #hud-type.typing::after{content:"▍";color:var(--warm);animation:type-blink .9s steps(1) infinite}
+  @keyframes type-blink{50%{opacity:0}}
+  #hud-ch3 .hud-num{font-size:clamp(26px,4vw,44px)}
+  #hud-sync.lit{color:#ffe9c9;text-shadow:0 0 26px rgba(255,196,110,.8)}
+  #hud-sync.pulse{animation:sync-pulse .6s ease}
+  @keyframes sync-pulse{0%{transform:scale(1)}35%{transform:scale(1.07)}100%{transform:scale(1)}}
+  .hud-cluster.boot{animation:hud-boot .9s steps(1) both}
+  @keyframes hud-boot{0%{opacity:0}12%{opacity:.7}20%{opacity:.15}32%{opacity:.85}45%{opacity:.3}60%,100%{opacity:1}}
+
+  /* 目标锁定框（屏幕中心，随距离接近收缩） */
+  #lockbox{
+    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+    border:1px solid rgba(143,232,255,.8);border-radius:2px;
+    box-shadow:0 0 20px rgba(120,210,255,.22),inset 0 0 16px rgba(120,210,255,.10);
+    opacity:0;pointer-events:none;z-index:20;
+  }
+  #lockbox .lb-c{position:absolute;left:50%;top:50%;width:2px;height:2px;margin:-1px 0 0 -1px;
+    background:var(--cyan);border-radius:50%;box-shadow:0 0 6px rgba(143,232,255,.9)}
+  #lockbox::before,#lockbox::after{content:"";position:absolute;width:8px;height:8px;
+    border:1px solid rgba(200,240,255,.9)}
+  #lockbox::before{left:-4px;top:-4px;border-right:0;border-bottom:0}
+  #lockbox::after{right:-4px;bottom:-4px;border-left:0;border-top:0}
+
+  /* 穿越时刻：色温 flash（200ms）+ 画面微震（±2px / 150ms） */
+  #flash{position:absolute;inset:0;opacity:0;pointer-events:none;z-index:6}
+  #flash.flash-a{background:radial-gradient(circle at 50% 50%,rgba(238,250,255,.95) 0%,rgba(130,215,255,.55) 42%,rgba(130,215,255,0) 74%)}
+  #flash.flash-b{background:radial-gradient(circle at 50% 46%,rgba(255,244,222,.92) 0%,rgba(255,180,94,.5) 40%,rgba(255,180,94,0) 72%)}
+  #flash.on{animation:hud-flash .2s ease-out}
+  @keyframes hud-flash{0%{opacity:0}25%{opacity:.92}100%{opacity:0}}
+  #stage.quake{animation:hud-quake .15s linear}
+  @keyframes hud-quake{
+    0%,100%{transform:translate(0,0)}
+    20%{transform:translate(1.7px,-1.3px)}
+    40%{transform:translate(-1.9px,1.5px)}
+    60%{transform:translate(1.3px,1.8px)}
+    80%{transform:translate(-1.5px,-1.7px)}
+  }
+
+  /* 待机呼吸提示（停留 3s 出现，任何输入消失） */
+  #idle-hint{
+    position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:30;
+    color:var(--mut);font-size:12px;letter-spacing:.32em;text-indent:.32em;
+    opacity:0;transition:opacity .6s ease;pointer-events:none;
+  }
+  #idle-hint.on{opacity:1;animation:idle-breathe 2.6s ease-in-out infinite}
+  @keyframes idle-breathe{0%,100%{opacity:.35}50%{opacity:.95}}
+
+  /* 静音状态指示 / M 键全局静音 */
+  #mute-btn{
+    position:fixed;right:26px;bottom:72px;z-index:40;
+    display:flex;align-items:center;gap:8px;
+    background:rgba(9,14,30,.55);border:1px solid rgba(128,198,255,.28);border-radius:999px;
+    padding:7px 14px;cursor:pointer;
+    font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--ink);
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    transition:border-color .3s ease;
+  }
+  #mute-btn:hover{border-color:rgba(150,220,255,.6)}
+  #mute-btn .ico{color:var(--cyan);font-size:10px}
+  #mute-btn.muted{color:var(--mut)}
+  #mute-btn.muted .ico{color:var(--mut)}
+
+  /* ============ 静态模式（prefers-reduced-motion） ============ */
+  #reduced-ui{display:none}
+  body.reduced #reduced-ui{
+    display:flex;position:fixed;bottom:32px;left:50%;transform:translateX(-50%);z-index:40;
+    gap:16px;align-items:center;
+  }
+  #reduced-ui button{
+    background:rgba(9,14,30,.55);border:1px solid rgba(128,198,255,.28);color:var(--ink);
+    width:40px;height:40px;border-radius:50%;cursor:pointer;font-size:18px;line-height:1;
+    display:flex;align-items:center;justify-content:center;
+  }
+  #reduced-dots{display:flex;gap:10px}
+  #reduced-dots .dot{width:10px;height:10px;border-radius:50%;padding:0}
+  #reduced-dots .dot.active{background:var(--cyan);box-shadow:0 0 10px rgba(140,220,255,.9)}
+  body.reduced #scroll-track,
+  body.reduced #hint,
+  body.reduced #tour-btn,
+  body.reduced #progress{display:none}
+  @media (prefers-reduced-motion:reduce){
+    .wheel{animation:none}
+    .ui{transition:none}
+    #fade{transition:none}
+    /* P1 反馈层：无微震无 sting，HUD 切换用淡入淡出（无脉冲/闪烁动画） */
+    #idle-hint.on,#hud-sync.pulse,.hud-cluster.boot,.hud-dot.docking,
+    #hud-type.typing::after,#flash.on{animation:none}
+    #flash{display:none}
+    .hud-cluster{transform:none;transition:opacity .5s ease}
+  }
+
+  /* ============ 窄屏自适应（HUD 组件压缩到左下角一列） ============ */
+  @media (max-width:720px){
+    #topbar{padding:12px 14px}
+    .brand .sub,.brand-sep{display:none}
+    .nav-btn{padding:7px 7px;letter-spacing:.05em;font-size:12px}
+    .title:not(.hero) .t-sub{display:none}
+    #titles{left:6vw;right:14vw;top:9vh;bottom:auto;align-content:start;max-width:none}
+    .t-main{font-size:clamp(22px,6.4vw,34px)}
+    .hero .t-main{font-size:clamp(26px,7.4vw,40px)}
+    .hero .t-sub{display:block;font-size:12px;line-height:1.8;max-width:34ch}
+    .hero-cta{margin-top:18px;gap:10px}
+    .hero-cta button{padding:10px 15px;font-size:11px;letter-spacing:.12em}
+    .hero-meta{font-size:9px;letter-spacing:.14em;margin-top:14px;max-width:90vw}
+    .track{height:24vh}
+    #progress{right:10px}
+    #tour-btn{right:12px;bottom:64px;padding:8px 13px;font-size:11px}
+    #hint{bottom:96px}
+    #idle-hint{bottom:96px}
+    #hud{left:12px;bottom:14px;max-width:60vw}
+    #hud-ch1 .hud-row{display:none}
+    .hud-cluster{padding:8px 10px;border-radius:8px}
+    .hud-num{font-size:clamp(20px,6vw,30px)}
+    #hud-ch3 .hud-num{font-size:clamp(18px,5vw,26px)}
+    .hud-row{font-size:10px;gap:6px;margin-top:4px}
+    .bar{width:56px}
+    .hud-cap{letter-spacing:.2em;font-size:9px}
+    #hud-type{font-size:10px;letter-spacing:.06em}
+    #lockbox::before,#lockbox::after{width:6px;height:6px}
+    #mute-btn{right:12px;bottom:116px;padding:6px 10px;font-size:10px}
+    #idle-hint{bottom:64px;font-size:11px}
+  }
+</style>
+</head>
+<body data-chapter="1">
+
+<!-- 滚动轨道：页面总高约 7 屏视口高 -->
+<div id="scroll-track" aria-hidden="true"></div>
+
+<!-- 固定铺满视口的场景层（对齐原帖管线：视频=画面唯一来源，图片=海报/静态模式/失败兜底） -->
+<div id="stage">
+  <!-- 底层海报：首屏第一印象（视频就绪前）+ 加载失败静态兜底 + reduced-motion 静态模式关键帧 -->
+  <canvas id="scene" aria-hidden="true"></canvas>
+  <!-- 程序化引擎（v2 连续相机路径）：dolly-in + 光晕换图 + 星尘/薄雾/前景 -->
+  <!-- 静态模式章节切换过场 -->
+  <div id="fade" aria-hidden="true"></div>
+  <!-- P1 反馈层：穿越时刻色温 flash（青白脉冲 / 暖色脉冲，200ms） -->
+  <div id="flash" aria-hidden="true"></div>
+</div>
+
+<header id="topbar" class="ui">
+  <div class="brand">
+    <span class="logo">ASTRA</span>
+    <span class="brand-sep"></span>
+    <span class="sub">深空信标计划 · 程序化引擎档案</span>
+  </div>
+  <nav id="chapter-nav" aria-label="章节导航">
+    <button class="nav-btn active" data-ch="0" type="button"><span class="n">01</span><span class="t">接近</span></button>
+    <button class="nav-btn" data-ch="1" type="button"><span class="n">02</span><span class="t">对接</span></button>
+    <button class="nav-btn" data-ch="2" type="button"><span class="n">03</span><span class="t">点亮</span></button>
+  </nav>
+</header>
+
+<div id="titles" class="ui" aria-live="polite">
+  <section class="title hero" id="title-0">
+    <p class="t-kicker">ASTRA PROJECT · 深空信标计划</p>
+    <h1 class="t-main">出发，去寂静深处。</h1>
+    <p class="t-sub">远航船「辰星」已航行一百一十二年，目的地是一座久未应答的信标站。滚动滚轮接管驾驶——往下是接近，往上是回望。</p>
+    <div class="hero-cta">
+      <button id="hero-tour" type="button"><span class="i">▶</span>开始自动漫游</button>
+      <button id="hero-down" type="button">滚动接管 · 继续接近<span class="i">↓</span></button>
+    </div>
+    <p class="hero-meta">程序化引擎版（无视频）· 三章旅程 · 航程 120.0 KM · 建议开启声音（点击任意处激活 · M 静音 · H 口播模式）</p>
+  </section>
+  <section class="title" id="title-1">
+    <p class="t-kicker">CHAPTER 02 · RENDEZVOUS</p>
+    <h2 class="t-main">灯塔仍在，等一位访客。</h2>
+    <p class="t-sub">轨道缓缓修正，对接环在沉睡一个世纪后解锁，港灯为你亮起。</p>
+  </section>
+  <section class="title" id="title-2">
+    <p class="t-kicker">CHAPTER 03 · IGNITION</p>
+    <h2 class="t-main">点亮它，回应一万光年。</h2>
+    <p class="t-sub">点火序列启动，晶体环逐环亮起——请回应来自星海彼岸的呼叫。</p>
+  </section>
+</div>
+
+<aside id="progress" class="ui" aria-hidden="true">
+  <div class="track" id="progress-track">
+    <span class="tick" style="top:55%"></span>
+    <span class="tick" style="top:75%"></span>
+    <div id="progress-fill"></div>
+    <div id="progress-head"></div>
+  </div>
+  <div id="progress-pct">000</div>
+</aside>
+
+<div id="hint" class="ui">
+  <span class="mouse"><span class="wheel"></span></span>
+  <span class="txt">滚动 推进时间轴</span>
+</div>
+
+<button id="tour-btn" class="ui" type="button" aria-label="切换自动漫游">
+  <span class="ico" id="tour-ico">▶</span><span id="tour-label">自动漫游 · 45s</span>
+</button>
+
+<!-- ============ P1 反馈层：计量 HUD（章集群互斥，JS 淡切） ============ -->
+<aside id="hud" class="ui" aria-hidden="true">
+  <!-- SEG1（0–55%）：距离计 + 接近速度 -->
+  <div class="hud-cluster" id="hud-ch1">
+    <div class="hud-cap">RANGE TO PORT · 目标距离</div>
+    <div class="hud-big"><span class="hud-num" id="hud-dist">120.0</span><span class="hud-unit">km</span></div>
+    <div class="hud-row"><span>接近速度</span><span class="v"><span id="hud-closing">105</span> m/s</span></div>
+  </div>
+  <!-- 穿越 A（55%）→ SEG2（55–75%）：对接状态灯 + 压强 + 舱内传感器 -->
+  <div class="hud-cluster" id="hud-dock">
+    <div class="hud-cap">DOCKING · 舱内环境</div>
+    <div class="hud-row"><span class="hud-dot" id="dock-dot"></span><span id="dock-state">STANDBY</span></div>
+    <div class="hud-row"><span>舱内压强</span><span class="v"><span id="hud-kpa">0</span> kPa</span></div>
+    <div class="hud-row"><span>氧气 O₂</span><span class="v"><span id="hud-o2">20.9</span> %</span></div>
+    <div class="hud-row"><span>电力</span><span class="bar"><i id="hud-pwr"></i></span><span class="v sm"><span id="hud-pwr-v">0</span>%</span></div>
+    <div class="hud-row"><span>信号</span><span class="bar"><i id="hud-sig"></i></span><span class="v sm"><span id="hud-sig-v">0</span>%</span></div>
+  </div>
+  <!-- 穿越 B（75%）→ SEG3（75–100%）：打字机 + 光传导同步率 -->
+  <div class="hud-cluster" id="hud-ch3">
+    <div id="hud-type"></div>
+    <div class="hud-cap">SYNC · 光传导同步率</div>
+    <div class="hud-big"><span class="hud-num" id="hud-sync">0</span><span class="hud-unit">%</span></div>
+    <div class="bar wide"><i id="hud-sync-fill"></i></div>
+  </div>
+</aside>
+
+<!-- 待机呼吸提示（停留 3s 出现） -->
+<div id="idle-hint" class="ui" aria-hidden="true">继续接近 ↓</div>
+
+<!-- 静音状态指示（M 键全局静音） -->
+<button id="mute-btn" class="ui" type="button" aria-label="切换声音（M 键）" title="M 键切换">
+  <span class="ico" id="mute-ico">◉</span><span id="mute-txt">声音 待命</span>
+</button>
+
+<div id="reduced-ui" class="ui">
+  <button id="prev-ch" type="button" aria-label="上一章">‹</button>
+  <div id="reduced-dots">
+    <button class="dot active" data-ch="0" type="button" aria-label="第一章：接近"></button>
+    <button class="dot" data-ch="1" type="button" aria-label="第二章：对接"></button>
+    <button class="dot" data-ch="2" type="button" aria-label="第三章：点亮"></button>
+  </div>
+  <button id="next-ch" type="button" aria-label="下一章">›</button>
+</div>
+
+<noscript>
+  <style>#stage{background:#04060e url(assets/approach.png) center/cover no-repeat}</style>
+  <div class="noscript">
+    <p>本站由 JavaScript 与 Canvas 实时渲染驱动，请启用 JavaScript 后访问。<br>ASTRA · 深空信标计划</p>
+  </div>
+</noscript>
+
+<script src="js/astra-scene.js"></script>
+<script src="js/astra-audio.js"></script>
+<script src="js/astra-hud.js"></script>
+
+<script>
+/* 程序化引擎档案版主循环：滚动 → 引擎相机（无视频层） */
+(function () {
+  'use strict';
+  var win = window, doc = document;
+  var stage = doc.getElementById('stage');
+  var canvas = doc.getElementById('scene');
+  if (!stage || !canvas || !win.AstraEngine) return;
+  var ctx = canvas.getContext('2d', { alpha: false });
+  var Art = win.AstraEngine;
+  var track = doc.getElementById('scroll-track');
+  var navBtns = [].slice.call(doc.querySelectorAll('#chapter-nav .nav-btn'));
+  var titles = [].slice.call(doc.querySelectorAll('#titles .title'));
+  var fillEl = doc.getElementById('progress-fill');
+  var headEl = doc.getElementById('progress-head');
+  var pctEl = doc.getElementById('progress-pct');
+  var trackEl = doc.getElementById('progress-track');
+  var hintEl = doc.getElementById('hint');
+  var tourBtn = doc.getElementById('tour-btn');
+  var tourIco = doc.getElementById('tour-ico');
+  var tourLabel = doc.getElementById('tour-label');
+  var fadeEl = doc.getElementById('fade');
+  var dots = [].slice.call(doc.querySelectorAll('#reduced-dots .dot'));
+  var prevBtn = doc.getElementById('prev-ch'), nextBtn = doc.getElementById('next-ch');
+  var Aud = win.AstraAudio || null, Hud = win.AstraHUD || null;
+  var muteBtn = doc.getElementById('mute-btn'), muteIco = doc.getElementById('mute-ico'),
+      muteTxt = doc.getElementById('mute-txt');
+
+  var CH1 = 0.55, CH2 = 0.75, NAV = [0.02, 0.645, 0.835], SCREENS = 7, TOUR_FULL = 45;
+  var TITLE_WIN = [[0, 0, 0.285, 0.380], [0.610, 0.640, 0.655, 0.698], [0.795, 0.835, 3, 3]];
+  var REDUCED_KEYS = [0.0, 0.64, 0.86];
+  var st = { W: 0, H: 0, DPR: 1, minWH: 0, maxWH: 0, cx: 0, cy: 0, scrollable: 1,
+    target: 0, current: 0, speed: 0, clock: 0, lastTs: 0, raf: 0, running: false,
+    tour: { on: false, paused: false, startT: 0, elapsed: 0, dur: TOUR_FULL },
+    glide: { on: false, from: 0, to: 0, t0: 0, dur: 0, cb: null },
+    lastCh: -1, lastPct: -1, world: null, hintGone: false,
+    reduced: win.matchMedia('(prefers-reduced-motion: reduce)').matches, reducedIdx: 0 };
+
+  function clamp(x, a, b) { return x < a ? a : (x > b ? b : x); }
+  function ss(a, b, x) { if (b === a) return x >= a ? 1 : 0; x = clamp((x - a) / (b - a), 0, 1); return x * x * (3 - 2 * x); }
+  function lerp(a, b, p) { return a + (b - a) * p; }
+  function easeCubic(p) { return p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; }
+  function tourEase(p) { return p - 0.08 * Math.sin(p * Math.PI * 2); }
+
+  function measure(kp) {
+    var old = st.scrollable, prog = clamp((win.scrollY || 0) / old, 0, 1);
+    var w = stage.clientWidth || win.innerWidth, h = stage.clientHeight || win.innerHeight;
+    st.DPR = Math.min(win.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(2, Math.round(w * st.DPR));
+    canvas.height = Math.max(2, Math.round(h * st.DPR));
+    st.W = w; st.H = h; st.minWH = Math.min(w, h); st.maxWH = Math.max(w, h);
+    st.cx = w / 2; st.cy = h / 2;
+    if (!st.reduced) {
+      var vh = win.innerHeight;
+      track.style.height = Math.round(vh * SCREENS) + 'px';
+      st.scrollable = Math.max(1, doc.documentElement.scrollHeight - vh);
+      if (kp) win.scrollTo(0, prog * st.scrollable);
+    }
+  }
+  function build() {
+    st.world = Art.build({ W: st.W, H: st.H, minWH: st.minWH, maxWH: st.maxWH, area: st.W * st.H });
+    renderOnce();
+  }
+  function renderOnce() {
+    if (!st.world) return;
+    ctx.setTransform(st.DPR, 0, 0, st.DPR, 0, 0);
+    Art.render(ctx, st.world, { W: st.W, H: st.H, cx: st.cx, cy: st.cy,
+      minWH: st.minWH, maxWH: st.maxWH, t: st.current, clock: st.clock, speed: st.speed });
+  }
+  function updateDOM() {
+    var t = st.current;
+    var ch = t < CH1 ? 0 : (t < CH2 ? 1 : 2);
+    if (ch !== st.lastCh) {
+      st.lastCh = ch;
+      for (var i = 0; i < navBtns.length; i++) navBtns[i].classList.toggle('active', i === ch);
+      doc.body.setAttribute('data-chapter', String(ch + 1));
+      if (Aud) Aud.setChapter(ch + 1);
+    }
+    for (i = 0; i < 3; i++) {
+      var wnd = TITLE_WIN[i];
+      var fin = ss(wnd[0], wnd[1], t), fout = ss(wnd[2], wnd[3], t);
+      var o = Math.round(fin * (1 - fout) * 1000) / 1000;
+      var ty = Math.round(((1 - fin) * 18 - fout * 18) * 10) / 10;
+      var el = titles[i];
+      if (!el) continue;
+      if (el._o !== o) { el._o = o; el.style.opacity = o; }
+      if (el._ty !== ty) { el._ty = ty; el.style.transform = 'translateY(' + ty + 'px)'; }
+    }
+    var pct = Math.round(t * 100);
+    if (pct !== st.lastPct) {
+      st.lastPct = pct;
+      fillEl.style.height = pct + '%';
+      headEl.style.top = pct + '%';
+      pctEl.textContent = (pct < 10 ? '00' : pct < 100 ? '0' : '') + pct;
+    }
+  }
+  function setTourLabel() {
+    if (st.tour.on && !st.tour.paused) { tourIco.textContent = '❚❚'; tourLabel.textContent = '暂停漫游 · 空格'; }
+    else if (st.tour.on) { tourIco.textContent = '▶'; tourLabel.textContent = '继续漫游 · 空格'; }
+    else { tourIco.textContent = '▶'; tourLabel.textContent = '自动漫游 · 45s'; }
+  }
+  function beginTour(fromT) {
+    st.tour.on = true; st.tour.paused = false;
+    st.tour.startT = clamp(fromT, 0, 0.999); st.tour.elapsed = 0;
+    st.tour.dur = Math.max(6, (1 - st.tour.startT) * TOUR_FULL);
+    setTourLabel();
+    if (Aud) Aud.tourOn();
+  }
+  function startTour() {
+    dismissHint();
+    if (st.tour.on) { st.tour.paused = !st.tour.paused; setTourLabel(); return; }
+    cancelGlide();
+    var t0 = st.current;
+    if (t0 > 0.985) glideTo(0, 1100, function () { beginTour(0); });
+    else beginTour(t0);
+  }
+  function endTour() {
+    st.tour.on = false; st.tour.paused = false;
+    setTourLabel();
+    if (Aud) Aud.tourOff();
+  }
+  function glideTo(y, dur, cb) {
+    st.glide.on = true;
+    st.glide.from = win.scrollY || 0;
+    st.glide.to = clamp(y, 0, st.scrollable);
+    st.glide.t0 = performance.now();
+    st.glide.dur = dur || 900;
+    st.glide.cb = cb || null;
+  }
+  function cancelGlide() { st.glide.on = false; st.glide.cb = null; }
+  function glideToChapter(i) {
+    interruptTour();
+    var y = NAV[i] === 0 ? 0 : NAV[i] * st.scrollable;
+    glideTo(y, 700 + Math.abs(y - (win.scrollY || 0)) / st.scrollable * 2600);
+  }
+  function refreshMuteUI() {
+    if (!muteBtn) return;
+    var active = !!(Aud && Aud.isActive()), muted = !!(Aud && Aud.isMuted());
+    muteBtn.classList.toggle('muted', muted);
+    if (muteIco) muteIco.textContent = muted ? '○' : '◉';
+    if (muteTxt) muteTxt.textContent = active ? (muted ? '静音 · M' : '声音 开 · M') : '声音 待命';
+  }
+  function toggleMute() {
+    if (!Aud) return;
+    if (!Aud.isActive()) Aud.unlock(); else Aud.toggleMute();
+    refreshMuteUI();
+  }
+  if (muteBtn) muteBtn.addEventListener('click', function () { muteBtn.blur(); toggleMute(); });
+
+  function dismissHint() { if (st.hintGone) return; st.hintGone = true; hintEl.classList.add('gone'); }
+  function userAct() { dismissHint(); if (st.tour.on) endTour(); cancelGlide(); }
+  win.addEventListener('wheel', userAct, { passive: true });
+  win.addEventListener('touchstart', userAct, { passive: true });
+  win.addEventListener('keydown', function (e) {
+    var key = e.key;
+    if (key === ' ' || key === 'Spacebar') {
+      if (e.target && e.target.tagName === 'BUTTON') return;
+      e.preventDefault(); startTour(); return;
+    }
+    if (key === 'h' || key === 'H' || key === 'Escape') { doc.body.classList.toggle('ui-hidden'); return; }
+    if (key === 'm' || key === 'M') { toggleMute(); return; }
+    var step = 0;
+    if (key === 'ArrowDown') step = 0.045;
+    else if (key === 'ArrowUp') step = -0.045;
+    else if (key === 'PageDown') step = 0.2;
+    else if (key === 'PageUp') step = -0.2;
+    else if (key === 'Home') { e.preventDefault(); userAct(); glideTo(0, 900); return; }
+    else if (key === 'End') { e.preventDefault(); userAct(); glideTo(st.scrollable, 1400); return; }
+    if (step !== 0) { e.preventDefault(); userAct(); win.scrollBy({ top: step * st.scrollable, behavior: 'smooth' }); }
+  });
+  for (var nb = 0; nb < navBtns.length; nb++) {
+    (function (i) {
+      navBtns[i].addEventListener('click', function (e) {
+        e.preventDefault(); navBtns[i].blur();
+        if (Aud) Aud.tick();
+        dismissHint(); glideToChapter(i);
+      });
+    })(nb);
+  }
+  if (trackEl) trackEl.addEventListener('click', function (e) {
+    var r = trackEl.getBoundingClientRect();
+    var p = clamp((e.clientY - r.top) / r.height, 0, 1);
+    userAct();
+    if (Aud) Aud.tick();
+    glideTo(p * st.scrollable, 700 + Math.abs(p * st.scrollable - (win.scrollY || 0)) * 0.5);
+  });
+  tourBtn.addEventListener('click', function () { tourBtn.blur(); startTour(); });
+  var heroTour = doc.getElementById('hero-tour'), heroDown = doc.getElementById('hero-down');
+  if (heroTour) heroTour.addEventListener('click', function () {
+    heroTour.blur(); if (Aud) Aud.unlock(); startTour();
+  });
+  if (heroDown) heroDown.addEventListener('click', function () { heroDown.blur(); userAct(); glideToChapter(1); });
+
+  doc.addEventListener('visibilitychange', function () {
+    if (doc.hidden) { if (st.raf) win.cancelAnimationFrame(st.raf); st.running = false; }
+    else if (!st.running) { st.running = true; st.lastTs = 0; st.raf = win.requestAnimationFrame(frame); }
+  });
+  var rzTimer = 0, lastW = 0, lastH = 0;
+  win.addEventListener('resize', function () {
+    win.clearTimeout(rzTimer);
+    rzTimer = win.setTimeout(function () {
+      var w = win.innerWidth, h = win.innerHeight;
+      if (Math.abs(w - lastW) <= 2 && Math.abs(h - lastH) <= 140) return;
+      lastW = w; lastH = h;
+      measure(true); build();
+    }, 160);
+  }, { passive: true });
+
+  function frame(ts) {
+    if (!st.running) return;
+    var dt = st.lastTs ? Math.max(0, Math.min(0.05, (ts - st.lastTs) / 1000)) : 0.016;
+    st.lastTs = ts;
+    var sy = win.scrollY || doc.documentElement.scrollTop || 0;
+    st.target = clamp(sy / st.scrollable, 0, 1);
+    if (st.tour.on && !st.tour.paused) {
+      st.tour.elapsed += dt;
+      var tp = clamp(st.tour.elapsed / st.tour.dur, 0, 1);
+      win.scrollTo(0, (st.tour.startT + (1 - st.tour.startT) * tourEase(tp)) * st.scrollable);
+      if (tp >= 1) endTour();
+    }
+    if (st.glide.on) {
+      var gp = clamp((ts - st.glide.t0) / st.glide.dur, 0, 1);
+      win.scrollTo(0, Math.round(lerp(st.glide.from, st.glide.to, easeCubic(gp))));
+      if (gp >= 1) { st.glide.on = false; var cb = st.glide.cb; st.glide.cb = null; if (cb) cb(); }
+    }
+    var prev = st.current;
+    st.current += (st.target - st.current) * (1 - Math.exp(-dt * 3.4));
+    if (Math.abs(st.target - st.current) < 0.000015) st.current = st.target;
+    var inst = Math.abs(st.current - prev) / dt;
+    st.speed = st.speed * 0.86 + inst * 0.14;
+    st.clock += dt * clamp(st.speed * 42, 0, 1);
+    renderOnce();
+    updateDOM();
+    var spdN = clamp(st.speed / 0.22, 0, 1);
+    if (Aud) Aud.setSpeed(spdN);
+    if (Hud) Hud.update({ p: st.current, speed: spdN, dt: dt, clock: st.clock,
+      touring: st.tour.on && !st.tour.paused, gliding: st.glide.on, introDone: st.hintGone });
+    st.raf = win.requestAnimationFrame(frame);
+  }
+
+  function setReducedChapter(i) {
+    st.reducedIdx = clamp(i, 0, 2);
+    for (var k = 0; k < titles.length; k++) {
+      var el = titles[k];
+      el.style.opacity = ''; el.style.transform = ''; el._o = null; el._ty = null;
+      el.classList.toggle('active', k === st.reducedIdx);
+    }
+    for (k = 0; k < navBtns.length; k++) navBtns[k].classList.toggle('active', k === st.reducedIdx);
+    for (k = 0; k < dots.length; k++) dots[k].classList.toggle('active', k === st.reducedIdx);
+    st.current = REDUCED_KEYS[st.reducedIdx];
+    st.clock = 1.7; st.speed = 0; st.target = st.current;
+    renderOnce();
+    if (Aud) Aud.setChapter(st.reducedIdx + 1);
+    if (Hud) Hud.update({ p: st.current, speed: 0, dt: 0, clock: st.clock,
+      touring: false, gliding: false, introDone: true });
+  }
+  function switchReduced(i) {
+    i = clamp(i, 0, 2);
+    if (i === st.reducedIdx) return;
+    fadeEl.classList.add('on');
+    win.setTimeout(function () {
+      setReducedChapter(i);
+      win.setTimeout(function () { fadeEl.classList.remove('on'); }, 60);
+    }, 340);
+  }
+  for (var d = 0; d < dots.length; d++) {
+    (function (i) { dots[i].addEventListener('click', function () { dots[i].blur(); switchReduced(i); }); })(d);
+  }
+  if (prevBtn) prevBtn.addEventListener('click', function () { prevBtn.blur(); switchReduced(st.reducedIdx - 1); });
+  if (nextBtn) nextBtn.addEventListener('click', function () { nextBtn.blur(); switchReduced(st.reducedIdx + 1); });
+
+  (function init() {
+    lastW = win.innerWidth; lastH = win.innerHeight;
+    measure(false);
+    Art.load();
+    build();
+    if (Hud) Hud.init({ reduced: st.reduced });
+    if (Aud) { Aud.onState = refreshMuteUI; Aud.setChapter(1); }
+    refreshMuteUI();
+    if (st.reduced) {
+      doc.body.classList.add('reduced');
+      st.scrollable = 1;
+      setReducedChapter(0);
+    } else {
+      st.running = true; st.lastTs = 0;
+      st.raf = win.requestAnimationFrame(frame);
+    }
+  })();
+})();
+</script>
+</body>
+</html>
