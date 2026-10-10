@@ -104,7 +104,7 @@
           status: 'idle', started: false, urlIdx: 0, blobUrl: null,
           dur: 0, reveal: 0, revealed: false, revealT0: 0,
           want: null, timer: 0, deadline: 0, playFail: false,
-          a: 0, op: 0
+          a: 0, op: 0, primed: false
         };
         el.playsInline = true;                        /* 移动端内联播放 */
         el.muted = true;                              /* scrub 恒静音 */
@@ -207,6 +207,19 @@
     st.touring = !!env.touring;
     st.tourPaused = !!env.tourPaused;
     if (!segs[1].started && p > PRELOAD_AT) loadSeg(segs[1]);      /* 第二段预载 */
+    /* 漫游接缝预热（消除切换顿挫）：当前段还剩 ≤1.2s 时，把下一段提前
+     * display 进布局并 seek 到 0（透明、暂停）——接缝切换时 play() 命中热管线 */
+    if (st.touring && !st.tourPaused && st.engaged >= 0 && st.engaged + 1 < segs.length) {
+      var cur = segs[st.engaged];
+      var nx = segs[st.engaged + 1];
+      if (cur.dur > 0 && cur.dur - cur.el.currentTime <= 1.2 &&
+          nx.status === 'ready' && !nx.primed) {
+        nx.primed = true;
+        try { nx.el.currentTime = 0; } catch (e) {}
+      }
+    } else if (!st.touring) {
+      for (var q = 0; q < segs.length; q++) segs[q].primed = false;
+    }
     for (var i = 0; i < 2; i++) {
       var seg = segs[i];
       var base = i === 0 ? logic.base1(p) : logic.base2(p);
@@ -223,7 +236,7 @@
       }
       seg.a = a;
       seg.op = base * a;
-      var disp = seg.op > 0.001 ? '' : 'none';        /* 不可见段 display:none 停止解码 */
+      var disp = (seg.op > 0.001 || seg.primed) ? '' : 'none';  /* 不可见段 display:none（预热段除外） */
       if (seg.el._d !== disp) { seg.el._d = disp; seg.el.style.display = disp; }
       var o3 = Math.round(seg.op * 1000) / 1000;
       if (seg.el._o !== o3) { seg.el._o = o3; seg.el.style.opacity = o3; }
