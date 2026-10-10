@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#04090b">
+<meta name="description" content="BLOOM · 菌丝秘境 — 一次由滚动驱动的旅程：从暮色森林地表，穿过巨大蘑菇的伞盖，沉入发光的菌丝网络深处。">
+<title>BLOOM · 菌丝秘境 — 滚动驱动的发光菌丝之旅</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='6' fill='%235ce8c4'/%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%235ce8c4' stroke-opacity='.45'/%3E%3C/svg%3E">
+<style>
+:root{
+  --sans: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --serif: Georgia, 'Times New Roman', 'Songti SC', 'STSong', 'SimSun', serif;
+  --teal:#5ce8c4; --warm:#ffd98a;
+  --ink:#e7fbf2; --dim:rgba(231,251,242,.55);
+  --line:rgba(140,255,220,.22);
+  --glow:0 0 18px rgba(92,232,196,.35);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{overflow-x:hidden}
+body{
+  background:#04090b;color:var(--ink);font-family:var(--sans);
+  overflow-x:hidden;-webkit-font-smoothing:antialiased;
+}
+::selection{background:rgba(92,232,196,.25)}
+::-webkit-scrollbar{width:9px}
+::-webkit-scrollbar-track{background:#04090b}
+::-webkit-scrollbar-thumb{background:rgba(92,232,196,.28);border-radius:5px}
+::-webkit-scrollbar-thumb:hover{background:rgba(92,232,196,.5)}
+
+/* 滚动轨道：决定总行程（约 6 屏滚动距离） */
+.scroll-track{width:100%;height:700vh;height:700svh;pointer-events:none}
+
+/* 固定全屏场景层 */
+#stage{
+  position:fixed;top:0;left:0;width:100vw;height:100vh;height:100svh;
+  overflow:hidden;background:#04090b;
+}
+#stage canvas,.vignette{position:absolute;inset:0;width:100%;height:100%}
+#view{display:block}
+#fade{opacity:0;pointer-events:none}
+.vignette{
+  pointer-events:none;
+  background:radial-gradient(120% 90% at 50% 44%, transparent 55%, rgba(2,8,8,.5) 100%);
+}
+
+/* 素材加载态：主图 forest-well.png 解码完成前的一颗呼吸光点 */
+body.loading #stage::after{
+  content:'';position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;
+  border-radius:50%;background:var(--teal);box-shadow:0 0 18px var(--teal);
+  animation:loadPulse 1.2s ease-in-out infinite;
+}
+@keyframes loadPulse{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
+
+/* ---------- UI 通用 ---------- */
+.ui{transition:opacity .5s ease;user-select:none;-webkit-user-select:none}
+body.ui-hidden .ui{opacity:0 !important;pointer-events:none !important}
+
+/* 顶部：品牌 + 章节导航 */
+.topbar{
+  position:absolute;top:0;left:0;right:0;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:22px clamp(18px,4vw,46px);
+}
+.brand{display:flex;align-items:baseline;gap:12px;letter-spacing:.42em;font-size:15px;font-weight:600;color:#f2fff9}
+.brand-sub{font-size:11px;letter-spacing:.3em;color:var(--dim);font-weight:400}
+.chapters{display:flex;gap:clamp(14px,2.6vw,34px)}
+.chap{
+  background:none;border:none;cursor:pointer;color:var(--dim);
+  font-family:inherit;font-size:13px;letter-spacing:.24em;padding:6px 2px;position:relative;
+  transition:color .35s,text-shadow .35s;
+}
+.chap i{font-style:normal;font-size:10px;opacity:.55;margin-right:7px;letter-spacing:.1em}
+.chap::after{
+  content:'';position:absolute;left:2px;right:2px;bottom:0;height:1px;
+  background:linear-gradient(90deg,var(--teal),transparent);
+  transform:scaleX(0);transform-origin:left;transition:transform .4s ease;
+}
+.chap:hover{color:#dff5ec}
+.chap.active{color:#f4fff9;text-shadow:var(--glow)}
+.chap.active::after{transform:scaleX(1)}
+
+/* 左侧章节大标题 */
+.titles{position:absolute;left:clamp(22px,6vw,96px);top:0;bottom:0;width:min(52vw,620px);pointer-events:none}
+.title-card{
+  position:absolute;left:0;top:50%;
+  transform:translateY(-50%) translateX(26px);
+  opacity:0;transition:opacity .75s ease,transform .75s ease;max-width:100%;
+}
+.title-card.on{opacity:1;transform:translateY(-50%) translateX(0)}
+.eyebrow{font-size:11px;letter-spacing:.5em;color:var(--teal);display:flex;align-items:center;gap:14px}
+.eyebrow::before{content:'';width:30px;height:1px;background:linear-gradient(90deg,var(--teal),transparent)}
+.title-card h1{
+  font-family:var(--serif);font-weight:400;
+  font-size:clamp(30px,4.8vw,60px);line-height:1.32;letter-spacing:.05em;
+  color:#eefff7;margin:20px 0 18px;text-shadow:0 0 28px rgba(92,232,196,.22);
+}
+.tsub{font-size:11px;letter-spacing:.28em;color:var(--dim)}
+
+/* 右侧竖向探索进度条 */
+.rail{
+  position:absolute;right:clamp(12px,2.4vw,34px);top:50%;transform:translateY(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:9px;
+}
+.rail-cap{font-size:9px;letter-spacing:.12em;color:var(--dim);font-variant-numeric:tabular-nums}
+.rail-track{
+  position:relative;width:2px;height:34vh;min-height:150px;
+  background:rgba(140,255,220,.15);border-radius:2px;
+}
+.rail-fill{
+  position:absolute;inset:0;transform:scaleY(0);transform-origin:top;border-radius:2px;
+  background:linear-gradient(180deg,rgba(92,232,196,.9),rgba(255,217,138,.9));
+  box-shadow:0 0 10px rgba(92,232,196,.45);
+}
+.tick{position:absolute;left:-2px;width:6px;height:1px;background:rgba(140,255,220,.4)}
+.rail-dot{
+  position:absolute;left:50%;top:0;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;
+  background:#f2fff9;box-shadow:0 0 10px var(--teal);
+}
+.rail-pct{font-size:10px;color:var(--dim);letter-spacing:.1em;font-variant-numeric:tabular-nums}
+
+/* 底部居中滚动提示 */
+.hint{
+  position:absolute;left:50%;bottom:calc(26px + env(safe-area-inset-bottom,0px));
+  transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:12px;
+  transition:opacity .7s ease,transform .7s ease;
+}
+.hint.gone{opacity:0;transform:translateX(-50%) translateY(14px);pointer-events:none}
+.hint-mouse{width:22px;height:34px;border:1px solid var(--line);border-radius:11px;position:relative;opacity:.9}
+.hint-mouse i{
+  position:absolute;left:50%;top:6px;width:3px;height:8px;margin-left:-1.5px;border-radius:2px;
+  background:var(--teal);box-shadow:0 0 8px var(--teal);
+  animation:hintDrop 1.9s ease-in-out infinite;
+}
+@keyframes hintDrop{
+  0%{opacity:0;transform:translateY(0)}
+  25%{opacity:1}
+  70%{opacity:0;transform:translateY(13px)}
+  100%{opacity:0;transform:translateY(13px)}
+}
+.hint-text{font-size:11px;letter-spacing:.34em;color:var(--dim);white-space:nowrap}
+.hint-sub{font-size:10px;letter-spacing:.22em;color:rgba(231,251,242,.35);white-space:nowrap}
+
+/* 自动漫游按钮 */
+.tour{
+  position:absolute;right:clamp(16px,3vw,38px);bottom:calc(24px + env(safe-area-inset-bottom,0px));
+  display:flex;align-items:center;gap:9px;padding:11px 18px;border-radius:999px;
+  border:1px solid var(--line);background:rgba(6,20,17,.5);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  color:var(--ink);font-family:inherit;font-size:12px;letter-spacing:.2em;cursor:pointer;
+  transition:border-color .35s,box-shadow .35s;
+}
+.tour:hover{border-color:rgba(92,232,196,.6);box-shadow:0 0 20px rgba(92,232,196,.18)}
+.tour-icon{
+  display:inline-block;width:0;height:0;margin-left:2px;
+  border-left:9px solid var(--teal);border-top:6px solid transparent;border-bottom:6px solid transparent;
+}
+body.touring .tour-icon{
+  width:3px;height:11px;border:none;background:var(--teal);
+  box-shadow:5px 0 0 var(--teal);margin-left:0;
+}
+
+/* 窄屏适配：标题/导航收敛，主体画面居中不被遮挡 */
+@media (max-width:640px){
+  .topbar{padding:16px 18px}
+  .brand{font-size:13px;letter-spacing:.3em}
+  .brand-sub{display:none}
+  .chap{font-size:12px;letter-spacing:.14em}
+  .chap i{margin-right:4px}
+  .titles{left:20px;right:64px;width:auto}
+  .title-card h1{font-size:clamp(24px,8vw,38px)}
+  .rail{right:10px}
+  .rail-track{height:24vh;min-height:110px}
+  .tour-label{display:none}
+  .tour{padding:13px 15px}
+  .hint{bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+  .hint-text{letter-spacing:.22em}
+}
+
+/* 静态模式：停用装饰性 CSS 动画，仅保留章节淡入淡出 */
+@media (prefers-reduced-motion:reduce){
+  .hint-mouse i{animation:none;opacity:.8}
+  .title-card,.ui{transition-duration:.25s}
+  body.loading #stage::after{animation:none;opacity:.7}
+}
+
+/* ---------- P1 交互反馈层：计量 HUD（左下，每章一组） ---------- */
+.hud{
+  position:absolute;left:clamp(18px,4vw,46px);
+  bottom:calc(26px + env(safe-area-inset-bottom,0px));
+  pointer-events:none;min-width:150px;
+}
+.hud-block{
+  position:absolute;left:0;bottom:0;pointer-events:none;
+  opacity:0;transform:translateY(12px);
+  transition:opacity .3s ease,transform .3s ease;
+}
+.hud-block.on{opacity:1;transform:translateY(0)}
+.hud-key{font-size:10px;letter-spacing:.3em;color:var(--teal);margin-bottom:4px}
+.hud-main{display:flex;align-items:baseline;gap:8px}
+.hud-num{
+  font-size:clamp(28px,5vw,56px);font-weight:600;letter-spacing:.02em;line-height:1.05;
+  color:#eefff7;text-shadow:0 0 22px rgba(92,232,196,.28);
+  font-variant-numeric:tabular-nums;
+}
+.hud-unit{font-size:13px;letter-spacing:.18em;color:var(--dim)}
+.hud-line{margin-top:5px;font-size:11px;letter-spacing:.16em;color:var(--dim);font-variant-numeric:tabular-nums}
+.hud-line b{color:var(--ink);font-weight:400;margin:0 2px}
+#hudSync{transition:color .5s ease,text-shadow .5s ease}
+#hudSync.lit{color:#ffe9ad;text-shadow:0 0 16px rgba(255,224,150,.85)}
+.hud-done{
+  margin-top:7px;font-size:11px;letter-spacing:.34em;color:var(--warm);
+  opacity:0;transform:translateY(4px);
+  transition:opacity 1.4s ease,transform 1.4s ease;
+}
+.hud-done.on{opacity:.92;transform:none}
+
+/* 静音按钮（M 键等价；漫游按钮上方） */
+.mute{
+  position:absolute;right:clamp(16px,3vw,38px);bottom:calc(72px + env(safe-area-inset-bottom,0px));
+  display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;
+  border:1px solid var(--line);background:rgba(6,20,17,.5);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  color:var(--ink);font-family:inherit;font-size:11px;letter-spacing:.2em;cursor:pointer;
+  transition:border-color .35s;
+}
+.mute:hover{border-color:rgba(92,232,196,.6)}
+.mute-dot{width:6px;height:6px;border-radius:50%;background:var(--teal);box-shadow:0 0 8px var(--teal)}
+.mute.muted .mute-dot{background:rgba(231,251,242,.25);box-shadow:none}
+.mute.muted .mute-label{text-decoration:line-through;opacity:.6}
+
+/* 待机呼吸提示（停留 3s 出现，任何输入即隐） */
+.idle{
+  position:absolute;left:50%;bottom:calc(64px + env(safe-area-inset-bottom,0px));
+  transform:translateX(-50%);opacity:0;transition:opacity .6s ease;
+  pointer-events:none;white-space:nowrap;
+}
+.idle.show{opacity:1;animation:idleBreath 2s ease-in-out infinite}
+.idle-text{font-size:11px;letter-spacing:.32em;color:var(--dim)}
+@keyframes idleBreath{0%,100%{opacity:.3}50%{opacity:.95}}
+
+/* 穿越时刻：色彩脉冲（E 青碧 / F 变暗）+ 画面微震（施加于 #stage） */
+.transit-flash{position:absolute;inset:0;pointer-events:none;opacity:0;z-index:3}
+.transit-flash.flash-teal{
+  background:radial-gradient(60% 50% at 50% 44%,rgba(120,255,210,.5),rgba(60,220,180,.22) 60%,transparent 100%);
+  animation:flashTeal .2s ease-out;
+}
+.transit-flash.flash-dark{background:#020705;animation:flashDark .2s ease-out}
+@keyframes flashTeal{0%{opacity:0}30%{opacity:.5}100%{opacity:0}}
+@keyframes flashDark{0%{opacity:0}30%{opacity:.44}100%{opacity:0}}
+#stage.shake{animation:microShake .15s linear}
+@keyframes microShake{
+  0%,100%{transform:translate(0,0)}
+  25%{transform:translate(1.5px,-1.1px)}
+  50%{transform:translate(-1.7px,1.2px)}
+  75%{transform:translate(1.1px,1.6px)}
+}
+
+/* 移动端：HUD 压缩左下角 */
+@media (max-width:640px){
+  .hud{left:14px;bottom:calc(18px + env(safe-area-inset-bottom,0px));min-width:120px}
+  .hud-num{font-size:clamp(22px,7vw,32px)}
+  .hud-key{font-size:9px;letter-spacing:.22em}
+  .hud-line{font-size:10px;letter-spacing:.12em}
+  .hud-done{font-size:10px;letter-spacing:.24em}
+  .mute{right:12px;bottom:calc(64px + env(safe-area-inset-bottom,0px));padding:7px 11px;font-size:10px}
+  .idle{bottom:calc(52px + env(safe-area-inset-bottom,0px))}
+}
+
+/* 静态模式：穿越简化为 HUD 淡切（无脉冲无微震） */
+@media (prefers-reduced-motion:reduce){
+  .hud-block{transition-duration:.25s}
+  .idle.show{animation:none;opacity:.7}
+  #stage.shake{animation:none}
+  .transit-flash.flash-teal,.transit-flash.flash-dark{animation:none}
+}
+</style>
+</head>
+<body>
+
+<!-- 页面滚动行程（约 6 屏） -->
+<div class="scroll-track" aria-hidden="true"></div>
+
+<!-- 固定全屏场景层：canvas 整帧渲染（v2：主图一镜到底 + 视差/氛围程序层；
+     #fade 仅用于静态模式的章节取景过渡。视频 scrub 层预留接口见 bloom-scenes.js） -->
+<div id="stage">
+  <canvas id="view"></canvas>
+  <canvas id="fade" aria-hidden="true"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <!-- 顶部：品牌 + 章节导航 -->
+  <header class="ui topbar">
+    <div class="brand">BLOOM<span class="brand-sub">菌丝秘境</span></div>
+    <nav class="chapters" aria-label="章节导航">
+      <button class="chap" data-goto="0"><i>01</i>地表</button>
+      <button class="chap" data-goto="1"><i>02</i>伞下</button>
+      <button class="chap" data-goto="2"><i>03</i>深处</button>
+    </nav>
+  </header>
+
+  <!-- 左侧章节大标题 -->
+  <aside class="ui titles" aria-live="polite">
+    <div class="title-card" data-chapter="0">
+      <p class="eyebrow">第一章 · 地衣之上</p>
+      <h1>「苔藓之上，<br>另有星空。」</h1>
+      <p class="tsub">ABOVE THE LICHEN · 暮色地表与萤火</p>
+    </div>
+    <div class="title-card" data-chapter="1">
+      <p class="eyebrow">第二章 · 伞盖之下</p>
+      <h1>「穿过伞盖，<br>光开始呼吸。」</h1>
+      <p class="tsub">BENEATH THE VEIL · 孢子星尘与菌柱</p>
+    </div>
+    <div class="title-card" data-chapter="2">
+      <p class="eyebrow">第三章 · 菌丝核心</p>
+      <h1>「所有光，<br>都连成一张网。」</h1>
+      <p class="tsub">THE LIVING NETWORK · 菌丝光网与母核</p>
+    </div>
+  </aside>
+
+  <!-- 右侧竖向 0–100% 探索进度条 -->
+  <aside class="ui rail" aria-hidden="true">
+    <span class="rail-cap">0</span>
+    <div class="rail-track">
+      <i class="rail-fill"></i>
+      <i class="tick" style="top:33.33%"></i>
+      <i class="tick" style="top:66.67%"></i>
+      <i class="rail-dot"></i>
+    </div>
+    <span class="rail-cap">100</span>
+    <span class="rail-pct" id="pct">0%</span>
+  </aside>
+
+  <!-- 底部居中滚动提示 -->
+  <div class="ui hint" id="hint">
+    <span class="hint-mouse"><i></i></span>
+    <span class="hint-text">向下滚动 · 潜入菌丝秘境</span>
+    <span class="hint-sub">空格键 · 45 秒自动漫游</span>
+  </div>
+
+  <!-- 自动漫游 -->
+  <button class="ui tour" id="tourBtn" aria-label="自动漫游">
+    <span class="tour-icon" aria-hidden="true"></span>
+    <span class="tour-label">自动漫游</span>
+  </button>
+
+  <!-- P1 反馈层 · 计量 HUD（左下；每章一组，穿越时刻切换 bloom-feedback.js） -->
+  <aside class="ui hud" id="hud" aria-live="off">
+    <div class="hud-block" data-ch="0">
+      <p class="hud-key">环境光照 · LUX</p>
+      <p class="hud-main"><b class="hud-num" id="hudLux">420</b><span class="hud-unit">lx</span></p>
+      <p class="hud-line">森林时间 <b id="hudClock">19:42</b> · 暮色渐沉</p>
+    </div>
+    <div class="hud-block" data-ch="1">
+      <p class="hud-key">孢子浓度 · SPORES</p>
+      <p class="hud-main"><b class="hud-num" id="hudPpm">38</b><span class="hud-unit">ppm</span></p>
+      <p class="hud-line">距母核 <b id="hudDist">22.0</b> m</p>
+    </div>
+    <div class="hud-block" data-ch="2">
+      <p class="hud-key">下潜深度 · DEPTH</p>
+      <p class="hud-main"><b class="hud-num" id="hudDepth">0.0</b><span class="hud-unit">m</span></p>
+      <p class="hud-line">光传导同步率 <b id="hudSync">0%</b></p>
+      <p class="hud-done" id="syncDone">所有光，都连成一张网</p>
+    </div>
+  </aside>
+
+  <!-- P1 反馈层 · 声音开关（M 键等价，状态指示） -->
+  <button class="ui mute" id="muteBtn" aria-pressed="false" aria-label="声音开关（M）">
+    <span class="mute-dot" aria-hidden="true"></span>
+    <span class="mute-label">声音 开</span>
+  </button>
+
+  <!-- P1 反馈层 · 待机呼吸提示（停留 3s，按章换语） -->
+  <div class="ui idle" id="idleHint" aria-hidden="true">
+    <span class="idle-text" id="idleText">向下 ↓ 潜入伞下</span>
+  </div>
+
+  <!-- P1 反馈层 · 穿越时刻色彩脉冲（微震施加于 #stage） -->
+  <div class="transit-flash" id="transitFlash" aria-hidden="true"></div>
+</div>
+
+<noscript>
+  <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#04090b;color:#e7fbf2;font-size:14px;letter-spacing:.2em;z-index:9;text-align:center;padding:24px;">
+    BLOOM · 菌丝秘境需要启用 JavaScript 才能开始这段旅程。
+  </div>
+</noscript>
+
+<script src="bloom-scenes.js"></script>
+<script src="bloom-app.js"></script>
+<script src="bloom-feedback.js"></script>
+</body>
+</html>

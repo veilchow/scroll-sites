@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCROLL SITES · 滚动叙事网站集</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    min-height:100svh; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:#07080d; color:#e8ecf4; gap:48px; padding:48px 24px;
+    font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  }
+  header { text-align:center; }
+  h1 { font-size:clamp(22px,4vw,34px); letter-spacing:.35em; font-weight:300; }
+  header p { margin-top:12px; color:#8b93a7; font-size:14px; letter-spacing:.12em; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:22px; width:min(1060px,100%); }
+  a.card {
+    position:relative; display:block; text-decoration:none; color:inherit;
+    border:1px solid rgba(255,255,255,.08); border-radius:14px; overflow:hidden;
+    background:linear-gradient(160deg, var(--tint), rgba(10,12,20,.6) 55%);
+    min-height:230px; padding:26px 24px; display:flex; flex-direction:column; justify-content:flex-end;
+    transition:transform .35s ease, border-color .35s ease;
+  }
+  a.card:hover { transform:translateY(-6px); border-color:var(--accent); }
+  .card .en { font-size:12px; letter-spacing:.3em; color:var(--accent); }
+  .card h2 { font-size:26px; font-weight:600; margin:8px 0 10px; letter-spacing:.06em; }
+  .card p { font-size:13.5px; line-height:1.7; color:#aab2c5; }
+  .card .chips { margin-top:16px; display:flex; gap:8px; flex-wrap:wrap; }
+  .card .chips span {
+    font-size:11px; padding:4px 10px; border-radius:99px;
+    border:1px solid var(--accent); color:var(--accent); opacity:.85;
+  }
+  footer { color:#5a6172; font-size:12px; letter-spacing:.1em; text-align:center; line-height:1.8; }
+  .astra { --accent:#7db8ff; --tint:rgba(38,58,110,.35); }
+  .neon  { --accent:#ff5fa8; --tint:rgba(96,26,74,.30); }
+  .bloom { --accent:#7dffc4; --tint:rgba(18,72,58,.30); }
+</style>
+</head>
+<body>
+  <header>
+    <h1>SCROLL&nbsp;SITES</h1>
+    <p>滚动条就是播放器 · 三个程序化叙事宇宙 · 向下滚动开始旅程</p>
+  </header>
+  <div class="grid">
+    <a class="card astra" href="astra/">
+      <span class="en">ASTRA&nbsp;PROJECT</span>
+      <h2>深空信标计划</h2>
+      <p>星云接近 → 环绕对接 → 核心点亮。一座废弃信标站等待了一万光年，等你把它重新点亮。</p>
+      <div class="chips"><span>接近</span><span>对接</span><span>点亮</span></div>
+    </a>
+    <a class="card neon" href="neon/">
+      <span class="en">NEON&nbsp;DRIFT</span>
+      <h2>雨夜漫游</h2>
+      <p>高空俯瞰 → 沉降街面 → 地下市场。雨落下来城市才醒，再往下是城市的心跳。</p>
+      <div class="chips"><span>高空</span><span>街面</span><span>地下</span></div>
+    </a>
+    <a class="card bloom" href="bloom/">
+      <span class="en">BLOOM</span>
+      <h2>菌丝秘境</h2>
+      <p>暮色地表 → 伞盖穹顶 → 菌丝核心。苔藓之上另有星空，所有光都连成一张网。</p>
+      <div class="chips"><span>地表</span><span>伞下</span><span>深处</span></div>
+    </a>
+  </div>
+  <footer>
+    交互：滚轮推进/回退 · 空格=自动漫游 · H=口播模式 · 导航点击跳章<br>
+    纯前端零依赖 · 支持触摸与 prefers-reduced-motion · AI 关键帧升级接口见 ASSETS-SPEC.md
+  </footer>
+</body>
+</html>

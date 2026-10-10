@@ -1,0 +1,6 @@
+*.log
+__pycache__/
+mm_*.py
+serve_nocache.py
+gen_posters.py
+codex-last-message.txt
