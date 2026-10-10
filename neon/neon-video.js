@@ -53,9 +53,9 @@
   var REVEAL_MS = 400;             /* 就绪后 海报→视频 显影交叉淡化时长 */
   var TIMEOUT_MS = 8000;           /* 单段加载总预算（含备用 URL 重试） */
   var SEGS_DEF = [
-    { id: 'seg1', elId: 'vid1', urls: ['assets/seg1-scrub.mp4', 'assets/seg1.mp4'], span: SPANS[0], poster: 'assets/keys/k1.png' },
-    { id: 'seg2', elId: 'vid2', urls: ['assets/seg2-scrub.mp4', 'assets/seg2.mp4'], span: SPANS[1], poster: 'assets/keys/k2.png' },
-    { id: 'seg3', elId: 'vid3', urls: ['assets/seg3-scrub.mp4', 'assets/seg3.mp4'], span: SPANS[2], poster: 'assets/keys/k4.png' }
+    { id: 'seg1', elId: 'vid1', urls: ['assets/seg1-scrub.mp4', 'assets/seg1.mp4'], span: SPANS[0], poster: 'assets/keys2/k1.png' },
+    { id: 'seg2', elId: 'vid2', urls: ['assets/seg2-scrub.mp4', 'assets/seg2.mp4'], span: SPANS[1], poster: 'assets/keys2/k2.png' },
+    { id: 'seg3', elId: 'vid3', urls: ['assets/seg3-scrub.mp4', 'assets/seg3.mp4'], span: SPANS[2], poster: 'assets/keys2/k4.png' }
   ];
 
   /* ================= 纯逻辑（Node 桩测试对象） ================= */
