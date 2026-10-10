@@ -173,9 +173,9 @@
 
   /* ================= DOM 更新（导航高亮 / 标题淡入淡出 / 进度条） ================= */
   var TITLE_WIN = [
-    [0.004, 0.030, 0.285, 0.380],     /* ch1：光晕①升起(0.455)前退场 */
-    [0.610, 0.640, 0.655, 0.698],     /* ch2：光晕①衰减后进入，光晕②升起(0.700)前退场 */
-    [0.795, 0.835, 3, 3]              /* ch3：光晕②衰减后进入，驻留到终点 */
+    [0, 0, 0.285, 0.380],             /* ch1=首屏 hero：0% 即完整呈现，28.5–38% 淡出 */
+    [0.610, 0.640, 0.655, 0.698],     /* ch2：接缝后进入，第三章前退场 */
+    [0.795, 0.835, 3, 3]              /* ch3：后段进入，驻留到终点 */
   ];
   function updateDOM() {
     var t = st.current;
@@ -348,6 +348,20 @@
   });
 
   tourBtn.addEventListener('click', function () { tourBtn.blur(); startTour(); });
+
+  /* 首屏 hero CTA：接管自动漫游 / 提示滚动接管 */
+  var heroTour = doc.getElementById('hero-tour');
+  var heroDown = doc.getElementById('hero-down');
+  if (heroTour) heroTour.addEventListener('click', function () {
+    heroTour.blur();
+    if (Aud) Aud.unlock();
+    startTour();
+  });
+  if (heroDown) heroDown.addEventListener('click', function () {
+    heroDown.blur();
+    userAct();
+    glideToChapter(1);
+  });
 
   /* ================= 页面不可见时暂停 rAF ================= */
   doc.addEventListener('visibilitychange', function () {
