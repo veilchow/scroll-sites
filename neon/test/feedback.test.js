@@ -7,15 +7,14 @@
  *   2) 章界触发去重：一次向下跨越只触发一次（阻尼抖动不重复），
  *      退回滞回窗外重新武装后可再次触发；全程序扫每界恰好一次；
  *   3) AudioContext 手势前不创建：模块加载与无手势 ensure() 均不触碰构造器；
- *   4) scene.setSpeed 速度响应接口存在（接线检查）；
- *   5) chapterOf 章节映射与引擎一致。
+ *   4) 反馈层接线存在（NEONFX 接口；v3 视频化后 scene.js 已随程序引擎
+ *      退役至 ../neon-procedural/，本测试不再依赖它）；
+ *   5) chapterOf 章节映射与视频段界一致。
  * ============================================================ */
 'use strict';
 global.window = {};
-require('../scene.js');
 require('../audio.js');
 require('../feedback.js');
-var NEON = global.window.NEON;
 var SND = global.window.NEONSND;
 var NEONFX = global.window.NEONFX;
 var FXC = NEONFX.core;
@@ -109,8 +108,7 @@ SND.toggleMute();
 ok(SND.isMuted() === false, 'toggleMute 翻回');
 SND.suspend(); SND.resume();     // 无 context：静默
 
-/* ---------- 4) 速度响应接线 ---------- */
-ok(typeof NEON.setSpeed === 'function', 'NEON.setSpeed 存在（雨丝拉伸/速度光带入口）');
+/* ---------- 4) 反馈层接线 ---------- */
 ok(typeof NEONFX === 'object' && typeof NEONFX.update === 'function', 'NEONFX 接口存在');
 ok(NEONFX.init({}) === false, '无 DOM 环境下 init 安全返回 false');
 NEONFX.update(16, 0.5, 0, { rm: false });   // 未 init：静默短路

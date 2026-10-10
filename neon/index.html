@@ -4,8 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#04030c">
+<meta name="description" content="NEON DRIFT 雨夜漫游 —— 滚动驱动的叙事网站：镜头穿云俯冲落向雨夜街面，再沉入地下市场的心跳。">
 <link rel="icon" href="data:,">
-<link rel="preload" as="image" href="assets/city-tower.png">
+<link rel="preload" as="image" href="assets/keys/k1.png">
 <title>NEON DRIFT · 雨夜漫游</title>
 <style>
 :root{
@@ -35,7 +36,7 @@ html{scrollbar-color:#2a1a52 #070512;scrollbar-width:thin}
 /* 滚动轨道：撑出约 7 屏的滚动距离（总高 8 屏视口） */
 #spacer{height:800vh;height:800svh}
 
-/* ===== 场景层：固定铺满视口 ===== */
+/* ===== 场景层：固定铺满视口（v3：视频 = 画面唯一来源，无 canvas） ===== */
 #stage{
   position:fixed;
   left:0;right:0;top:0;
@@ -47,16 +48,27 @@ html{scrollbar-color:#2a1a52 #070512;scrollbar-width:thin}
   isolation:isolate;
   z-index:0;
 }
-/* 主图层画布：scene.js 以 cover 语义连续平移/缩放整幅长图 city-tower.png（一镜到底），
-   并在其上绘制远景 0.7× / 前景 1.3× 视差与雨/雾/色温氛围 */
-#cv{position:absolute;inset:0;width:100%;height:100%;z-index:2}
-/* 暗角 + 扫描线（位于绘制层之上，canvas 另有随 p 连续变化的动态暗角） */
-#fx{
-  position:absolute;inset:0;z-index:3;pointer-events:none;opacity:.9;
-  background:
-    radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(2,1,10,.40) 100%),
-    repeating-linear-gradient(0deg, rgba(0,0,0,.10) 0 1px, transparent 1px 3px);
+/* 底层海报：首屏第一印象（视频就绪前）+ 加载失败静态兜底 + reduced-motion 静态模式关键帧 */
+#poster{
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;object-position:50% 50%;display:block;z-index:1;
 }
+/* 画面主体：三段全关键帧 scrub 视频（neon-video.js）
+   seg1 0–33%（k1→k2 穿云俯冲）、seg2 33–66%（k2→k3 沉降街面）、
+   seg3 66–100%（k3→k4 入地）。33%/66% 接缝相邻段共享构图关键帧、
+   短暂交叠交叉淡化（权重互补和恒 1）；scrub 恒 muted，漫游时 unmuted 三段连播。
+   任一段失败 → 海报静态兜底（按覆盖段切 k1/k2/k4）。 */
+#stage video{
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;object-position:50% 50%;z-index:2;
+  opacity:0;pointer-events:none;background:transparent;
+}
+/* 静态模式章节切换过场 */
+#fade{
+  position:absolute;inset:0;z-index:5;background:#04030c;opacity:0;
+  transition:opacity .34s ease;pointer-events:none;
+}
+#fade.on{opacity:1}
 
 /* ===== UI ===== */
 .ui{position:fixed;z-index:20;transition:opacity .4s ease}
@@ -99,17 +111,20 @@ body.ui-hidden .ui{opacity:0!important;pointer-events:none!important}
 #tour-btn:hover{border-color:var(--cyn);box-shadow:0 0 14px rgba(38,230,255,.35)}
 #tour-btn.disabled{opacity:.45;cursor:not-allowed}
 
-/* 左侧大标题 */
+/* 左侧大标题（网格堆叠 + JS 淡入淡出；RM 静态模式用 .active 淡切） */
 #titles{
-  left:clamp(16px,5vw,84px);top:50%;transform:translateY(-50%);
-  width:min(46vw,620px);height:230px;pointer-events:none;
+  left:clamp(16px,5vw,84px);top:0;bottom:0;
+  width:min(46vw,620px);
+  display:grid;align-content:center;
+  pointer-events:none;
 }
 .ch-title{
-  position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:14px;
+  grid-area:1/1;
+  display:flex;flex-direction:column;justify-content:center;gap:14px;
   opacity:0;transform:translateY(26px);
-  transition:opacity .6s ease,transform .6s ease;
 }
-.ch-title.active{opacity:1;transform:none}
+body.reduced .ch-title{transition:opacity .3s ease}
+body.reduced .ch-title.active{opacity:1;transform:none}
 .ch-num{
   font-size:12px;letter-spacing:.5em;color:var(--cyn);
   text-shadow:0 0 10px rgba(38,230,255,.7);
@@ -119,6 +134,25 @@ body.ui-hidden .ui{opacity:0!important;pointer-events:none!important}
   text-shadow:0 0 14px rgba(255,45,149,.45),0 2px 30px rgba(10,4,30,.9);
 }
 .ch-sub{font-size:11px;letter-spacing:.4em;color:var(--dim)}
+/* 首屏 hero：品牌版式 + 双 CTA（仅第一章，0% 即完整可见，滚动后随节奏淡出） */
+.hero .ch-line{font-size:clamp(30px,4.8vw,60px)}
+.hero .ch-sub{letter-spacing:.1em;line-height:1.9;max-width:44ch;font-size:12px}
+.hero-cta{display:flex;gap:12px;margin-top:10px;flex-wrap:wrap;pointer-events:auto}
+.hero-cta button{
+  font:inherit;font-size:12px;letter-spacing:.18em;color:var(--ink);cursor:pointer;
+  padding:12px 20px;border-radius:999px;
+  background:rgba(12,8,30,.55);border:1px solid rgba(38,230,255,.5);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  transition:border-color .3s,box-shadow .3s,transform .3s;
+}
+.hero-cta button .i{margin:0 8px 0 0;color:var(--cyn)}
+.hero-cta button:last-child .i{margin:0 0 0 8px}
+.hero-cta button:hover{
+  border-color:var(--cyn);transform:translateY(-1px);
+  box-shadow:0 0 22px rgba(38,230,255,.35);
+  text-shadow:0 0 12px rgba(38,230,255,.8);
+}
+.hero-meta{margin:6px 0 0;font-size:10px;letter-spacing:.22em;color:rgba(233,230,247,.5)}
 
 /* 右侧探索进度条 0–100% */
 #rail{
@@ -127,7 +161,7 @@ body.ui-hidden .ui{opacity:0!important;pointer-events:none!important}
 }
 #rail .cap{font-size:10px;letter-spacing:.18em;color:var(--dim);font-variant-numeric:tabular-nums}
 #rail .cap#pct{color:#fff;text-shadow:0 0 8px rgba(38,230,255,.8)}
-#rail .track{position:relative;width:2px;height:min(42vh,380px);background:rgba(233,230,247,.14);border-radius:2px}
+#rail .track{position:relative;width:2px;height:min(42vh,380px);background:rgba(233,230,247,.14);border-radius:2px;cursor:pointer}
 #rail-fill{
   position:absolute;top:0;left:-1px;width:4px;height:0%;border-radius:2px;
   background:linear-gradient(180deg,var(--cyn),var(--mag));
@@ -293,14 +327,20 @@ kbd{
 #mute-btn.muted{color:var(--dim);border-color:rgba(233,230,247,.2)}
 #mute-btn.muted::before{color:rgba(233,230,247,.35);text-decoration:line-through}
 
-/* ===== 窄屏自适应（P1：HUD 压缩左下角） ===== */
-@media (max-width:760px){
+/* ===== 窄屏自适应（≤720px：标题上移避开 HUD/提示，hero 压缩不碰撞） ===== */
+@media (max-width:720px){
   #titles{
-    top:auto;bottom:calc(64px + env(safe-area-inset-bottom,0px) + 92px);
-    left:16px;right:76px;width:auto;height:150px;transform:none;
+    top:9vh;bottom:auto;left:16px;right:76px;width:auto;
+    align-content:start;transform:none;
   }
+  .ch-title{justify-content:flex-start}
   .ch-line{font-size:clamp(19px,6vw,28px)}
   .ch-title{gap:8px}
+  .hero .ch-line{font-size:clamp(24px,6.8vw,36px)}
+  .hero .ch-sub{font-size:11px;line-height:1.75;max-width:34ch}
+  .hero-cta{margin-top:4px;gap:8px}
+  .hero-cta button{padding:10px 14px;font-size:11px;letter-spacing:.12em}
+  .hero-meta{font-size:9px;letter-spacing:.14em;margin-top:2px}
   #rail .track{height:24vh}
   #keys{display:none}
   .brand b{font-size:12px;letter-spacing:.3em}
@@ -328,7 +368,7 @@ kbd{
 /* ===== prefers-reduced-motion：静态模式（P1：无微震无动画，HUD 淡切） ===== */
 @media (prefers-reduced-motion: reduce){
   #hint .chev{animation:none}
-  .ch-title{transform:none;transition:opacity .3s}
+  body.reduced .ch-title{transition:opacity .2s}
   .ui{transition:opacity .2s}
   .nav-btn::after{transition:none}
   .hud-ch.in{animation:none;transition:opacity .25s}
@@ -348,11 +388,15 @@ kbd{
 
 <div id="spacer" aria-hidden="true"></div>
 
-<div id="stage" role="img" aria-label="NEON DRIFT 雨夜漫游：镜头沿一张连续的雨夜城市剖面长图，从高空一路下沉到街面、再沉入地下市场">
-  <!-- 主图层：唯一素材 assets/city-tower.png（724×2172 竖幅城市剖面），
-       由 scene.js 以相机模型连续取景 —— 无换图、无交叉淡化 -->
-  <canvas id="cv" aria-hidden="true"></canvas>
-  <div id="fx" aria-hidden="true"></div>
+<!-- 固定铺满视口的画面层（v3 视频优先：视频 = 画面唯一来源；
+     海报 = 首屏第一印象 / 失败兜底 / 静态模式关键帧；无 canvas、无程序渲染） -->
+<div id="stage" role="img" aria-label="NEON DRIFT 雨夜漫游：镜头穿云俯冲落向雨夜街面，再沉入地下市场的心跳">
+  <img id="poster" src="assets/keys/k1.png" alt="" aria-hidden="true">
+  <video id="vid1" muted playsinline preload="none" aria-hidden="true"></video>
+  <video id="vid2" muted playsinline preload="none" aria-hidden="true"></video>
+  <video id="vid3" muted playsinline preload="none" aria-hidden="true"></video>
+  <!-- 静态模式章节切换过场 -->
+  <div id="fade" aria-hidden="true"></div>
 </div>
 
 <header id="topbar" class="ui">
@@ -367,17 +411,24 @@ kbd{
 </header>
 
 <div id="titles" class="ui" aria-live="polite">
-  <div class="ch-title active">
-    <span class="ch-num">CH.01 · 高空</span>
+  <!-- 首屏 hero（ASTRA v3.1 模式）：kicker + 大标题 + 副标 + 双 CTA + 元信息，
+       0% 即完整可见，滚动后随节奏淡出；CTA 接真实行为 -->
+  <div class="ch-title hero" id="title-0">
+    <span class="ch-num">NEON DRIFT · 雨夜漫游</span>
     <h2 class="ch-line">「雨落下来，城市才醒。」</h2>
-    <span class="ch-sub">AERIAL — ABOVE THE RAIN</span>
+    <span class="ch-sub">从 480 米的雨夜高空起步——穿云、落地、入地。滚动滚轮接管镜头，一路沉到城市的心跳。</span>
+    <div class="hero-cta">
+      <button id="hero-tour" type="button"><span class="i">▶</span>开始自动漫游</button>
+      <button id="hero-down" type="button">滚动接管 · 继续下落<span class="i">↓</span></button>
+    </div>
+    <p class="hero-meta">三章旅程 · 海拔 480M · 建议开启声音（M 静音 · H 口播模式）</p>
   </div>
-  <div class="ch-title">
+  <div class="ch-title" id="title-1">
     <span class="ch-num">CH.02 · 街面</span>
     <h2 class="ch-line">「霓虹之下，人流如数据。」</h2>
     <span class="ch-sub">STREET — NEON PARADE</span>
   </div>
-  <div class="ch-title">
+  <div class="ch-title" id="title-2">
     <span class="ch-num">CH.03 · 地下</span>
     <h2 class="ch-line">「再往下，是城市的心跳。」</h2>
     <span class="ch-sub">UNDERGROUND — CITY HEARTBEAT</span>
@@ -444,14 +495,15 @@ kbd{
 </div>
 
 <noscript>
+  <style>#stage{background:#04030c url(assets/keys/k1.png) center/cover no-repeat}</style>
   <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#04030c;color:#e9e6f7;z-index:99;text-align:center;padding:24px">
     本页面需要启用 JavaScript 才能呈现雨夜漫游场景。
   </div>
 </noscript>
 
-<script src="scene.js"></script>
 <script src="audio.js"></script>
 <script src="feedback.js"></script>
+<script src="neon-video.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

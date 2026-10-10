@@ -1,35 +1,55 @@
 /* ============================================================
- * NEON DRIFT / 雨夜漫游 — app.js
- * 滚动进度 → 镜头时间轴；rAF 单循环；阻尼缓动；
- * 自动漫游 / 键盘 / UI 同步 / reduced-motion 静态模式 / 性能守卫
+ * NEON DRIFT / 雨夜漫游 — app.js（v3 · 视频优先架构）
+ * 滚动进度 → 视频时间轴（neon-video.js：三段 scrub 覆盖 0–100%）。
+ * 本文件只做交互外壳，rAF 单循环 = 阻尼进度 + 视频模块喂参 +
+ * UI/DOM 更新 + feedback/audio 喂参 + 舞台微颤（transform 到 #stage）。
+ * 无 canvas、无程序渲染（隔离原则：视频 = 画面唯一来源，失败兜底 =
+ * 海报关键帧；程序引擎存档于 ../neon-procedural/）。
+ * feedback.js / audio.js 不改动：与画面解耦，穿越门控 33%/66%
+ * 与视频接缝对齐。
  * ============================================================ */
 (function () {
   'use strict';
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function ss(a, b, x) {
+    if (b === a) return x >= a ? 1 : 0;
+    x = clamp((x - a) / (b - a), 0, 1);
+    return x * x * (3 - 2 * x);
+  }
 
-  var canvas = document.getElementById('cv');
   var stage = document.getElementById('stage');
+  var posterEl = document.getElementById('poster');
+  var fadeEl = document.getElementById('fade');
+  var POSTERS = ['assets/keys/k1.png', 'assets/keys/k2.png', 'assets/keys/k4.png'];
+
   var navBtns = Array.prototype.slice.call(document.querySelectorAll('.nav-btn'));
   var titles = Array.prototype.slice.call(document.querySelectorAll('.ch-title'));
   var railFill = document.getElementById('rail-fill');
+  var railTrack = document.querySelector('#rail .track');
   var pctEl = document.getElementById('pct');
   var hint = document.getElementById('hint');
   var tourBtn = document.getElementById('tour-btn');
 
-  var FP = [0.15, 0.50, 0.86];          // reduced-motion 三个相机位取景（同一长图的 crop）
-  var CH_TOPS = [0, 1 / 3, 2 / 3];      // 章起点 = 图高 0/33%/66% 的相机位
+  var NAV_LAND = [0.02, 0.36, 0.70];       // 导航落点：各章越过接缝后的稳定位
+  var TITLE_WIN = [
+    [0, 0, 0.16, 0.30],                    // ch1 hero：0% 即完整可见，16–30% 淡出
+    [0.36, 0.44, 0.60, 0.66],              // ch2：0.36 落点后进入，第二接缝前退场
+    [0.72, 0.80, 3, 3]                     // ch3：0.70 落点后进入，驻留到终点
+  ];
+  var TOUR_FULL_SEC = 45;                   // 匀速兜底节奏（视频可用时由视频时长接管）
 
-  /* P1 反馈层（缺文件时静默降级，站点照常运行） */
+  /* P1 反馈层 + 视频画面层（均自守卫，缺文件时外壳照常运行） */
   var FX = window.NEONFX || null;
   var SND = window.NEONSND || null;
+  var Vid = window.NEONVID || null;
 
   var rmMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
   var rm = rmMQ.matches;
 
   var targetP = 0, curP = 0, maxScroll = 1;
-  var timeLast = 0, rafId = 0;
-  var tour = { on: false, paused: false, phase: 'fwd', acc: 0, from: 0 };
-  var rmS = { idx: -1, prev: -1, fade: 1, dirty: false, drawn: false };
+  var timeLast = 0, rafId = 0, clock = 0;
+  var tour = { on: false, paused: false, phase: 'fwd', acc: 0, from: 0, startT: 0, elapsed: 0, dur: 0, videoPaced: false };
+  var rmS = { idx: -1 };
   var lastPct = -1, lastIdx = -1;
   var lastSpeedP = 0, speedSm = 0, lastMute = null;   // P1：速度平滑 / 静音状态指示
 
@@ -41,14 +61,13 @@
     var sy = window.scrollY || document.documentElement.scrollTop || 0;
     targetP = clamp(sy / maxScroll, 0, 1);
   }
-  /* 章节只是 UI 标记：ch1/ch2/ch3 = 图高的 0–33% / 33–66% / 66–100% 相机位区间
-     （CONTINUITY-SPEC §6）；画面本身始终是同一长图的连续相机，不随章节切换 */
+  /* 章节只是 UI 标记：ch1/ch2/ch3 = 0–33% / 33–66% / 66–100%（与视频段界对齐） */
   function chapterOf(p) { return p < 1 / 3 ? 0 : p < 2 / 3 ? 1 : 2; }
 
   function dismissHint() { if (hint) hint.classList.add('hide'); }
 
   /* ============================================================
-   * P1 反馈层：速度平滑 + 章界穿越 + HUD/声音/待机 每帧驱动
+   * P1 反馈层：速度平滑 + 章界穿越 + HUD/声音/待机 每帧驱动（不改动）
    * ============================================================ */
   var transitAt = FX && FX.core ? FX.core.makeTransitDetector([1 / 3, 2 / 3], 0.015) : null;
   if (FX && FX.init) {
@@ -69,7 +88,6 @@
     speedSm += (inst - speedSm) * (1 - Math.exp(-(dt / 1000) * 3.5));
     if (speedSm < 0.0005) speedSm = 0;
     var v = clamp(speedSm / 0.55, 0, 1);
-    if (NEON.setSpeed) NEON.setSpeed(isRM ? 0 : v);
     if (SND) SND.update(p, isRM ? 0 : v, dt);
     /* 章界穿越：探测器去重（±1.5% 滞回），一次跨越只触发一次 */
     if (transitAt) {
@@ -99,12 +117,18 @@
     if (muteTxt) muteTxt.textContent = mutedNow ? '静音' : '音效';
     muteBtn.classList.toggle('muted', mutedNow);
   }
+  function applyMute() {
+    if (SND && SND.hasContext()) { lastMute = SND.toggleMute(); }
+    if (Vid) Vid.setMuted(!!(SND && SND.isMuted()));   // 漫游视频原声跟随全局静音
+    syncMuteBtn();
+  }
 
   /* 首次用户手势初始化 AudioContext（幂等；scroll 不算手势，不触发） */
   function soundKick() { if (SND) SND.ensure(); }
   function poke() { if (FX) FX.onActivity(); }
 
   /* ---------- UI 同步 ---------- */
+  var titleO = [null, null, null], titleTy = [null, null, null];
   function syncUI(p) {
     var pct = Math.round(p * 100);
     if (pct !== lastPct) {
@@ -116,12 +140,26 @@
     if (idx !== lastIdx) {
       lastIdx = idx;
       for (var i = 0; i < navBtns.length; i++) navBtns[i].classList.toggle('active', i === idx);
-      for (var j = 0; j < titles.length; j++) titles[j].classList.toggle('active', j === idx);
+      if (rm) for (var j = 0; j < titles.length; j++) titles[j].classList.toggle('active', j === idx);
+    }
+    if (!rm) {
+      /* 标题淡入淡出窗口（hero 0% 即现 → 16–30% 淡出；ch2/ch3 对齐导航落点） */
+      for (var k = 0; k < 3; k++) {
+        var el = titles[k];
+        if (!el) continue;
+        var w = TITLE_WIN[k];
+        var fin = ss(w[0], w[1], p), fout = ss(w[2], w[3], p);
+        var o = Math.round(fin * (1 - fout) * 1000) / 1000;
+        var ty = Math.round(((1 - fin) * 26 - fout * 26) * 10) / 10;
+        if (titleO[k] !== o) { titleO[k] = o; el.style.opacity = o; }
+        if (titleTy[k] !== ty) { titleTy[k] = ty; el.style.transform = ty ? 'translateY(' + ty + 'px)' : ''; }
+      }
     }
     if (p > 0.02) dismissHint();
   }
 
-  /* ---------- 自动漫游（约 45s 走完全程，任何滚轮/触摸/方向键立即中断） ---------- */
+  /* ---------- 自动漫游（视频三段连播接管节奏；任何滚轮/触摸/方向键立即中断；
+     视频不可用（未就绪/失败）时回落 45s 匀速） ---------- */
   function setTourBtn() {
     if (rm) {
       tourBtn.disabled = true;
@@ -138,13 +176,22 @@
     tour.on = true;
     tour.paused = false;
     tour.acc = 0;
+    tour.elapsed = 0;
+    tour.videoPaced = false;
     if (targetP > 0.005) { tour.phase = 'rewind'; tour.from = targetP; }
-    else { tour.phase = 'fwd'; }
+    else { tour.phase = 'fwd'; tour.startT = 0; tour.dur = TOUR_FULL_SEC * 1000; }
     setTourBtn();
     dismissHint();
     if (SND) SND.blip(true);                 // P1：漫游启动确认音
   }
-  function stopTour() { tour.on = false; setTourBtn(); if (SND) SND.blip(false); }
+  function stopTour() {
+    tour.on = false;
+    tour.paused = false;
+    tour.videoPaced = false;
+    setTourBtn();
+    if (SND) SND.blip(false);
+    if (Vid) Vid.onTourEnd();                // 立即回 scrub + muted + seek 当前进度
+  }
   function toggleTour() {
     if (rm) return;
     if (!tour.on) startTour();
@@ -155,38 +202,52 @@
     if (!tour.on || tour.paused) return;
     tour.acc += dt;
     if (tour.phase === 'rewind') {
-      var k = clamp(tour.acc / 1000, 0, 1);
+      var k = clamp(tour.acc / 1000, 0, 1);       // 1s 回卷到起点（视频保持 scrub 态）
       var e = k * k * (3 - 2 * k);
       window.scrollTo(0, tour.from * (1 - e) * maxScroll);
-      if (k >= 1) { tour.phase = 'fwd'; tour.acc = 0; }
-    } else {
-      var k2 = clamp(tour.acc / 45000, 0, 1);
-      window.scrollTo(0, k2 * maxScroll);
-      if (k2 >= 1) stopTour();
+      if (k >= 1) { tour.phase = 'fwd'; tour.acc = 0; tour.elapsed = 0; tour.startT = 0; tour.dur = TOUR_FULL_SEC * 1000; }
+      return;
     }
+    /* fwd：视频三段 unmuted 连播接管漫游节奏（视频时长即漫游时长） */
+    var vp = Vid ? Vid.tourSync(curP) : null;
+    if (vp !== null) {
+      tour.videoPaced = true;
+      window.scrollTo(0, vp * maxScroll);
+      if (vp >= 0.9995) stopTour();
+      return;
+    }
+    if (tour.videoPaced) {                    // 视频段结束/不可用 → 从当前进度重定匀速节奏
+      tour.videoPaced = false;
+      tour.startT = clamp(curP, 0, 0.999);
+      tour.elapsed = 0;
+      tour.dur = Math.max(6, (1 - tour.startT) * TOUR_FULL_SEC) * 1000;
+    }
+    tour.elapsed += dt;
+    var k2 = clamp(tour.elapsed / tour.dur, 0, 1);
+    window.scrollTo(0, (tour.startT + (1 - tour.startT) * k2) * maxScroll);
+    if (k2 >= 1) stopTour();
   }
 
-  /* ---------- reduced-motion：同一长图三个相机位的取景 crop + 章节淡入淡出 ---------- */
-  function rmFrame(dt) {
+  /* ---------- reduced-motion：静态模式 = 海报三关键帧（k1/k2/k4）+ 章节淡切 ---------- */
+  function rmFrame() {
     var idx = chapterOf(targetP);
     if (idx !== rmS.idx) {
-      rmS.prev = rmS.idx;
+      var first = rmS.idx < 0;
       rmS.idx = idx;
-      rmS.fade = 0;
-      rmS.dirty = true;
-    }
-    if (rmS.dirty || !rmS.drawn) {
-      rmS.fade = clamp(rmS.fade + dt / 380, 0, 1);
-      var a = rmS.fade;
-      var cross = rmS.prev >= 0 && a < 1;
-      if (cross) NEON.render(FP[rmS.prev], 1 - a, true);      // 旧相机位（不清屏）
-      NEON.render(FP[idx], a, true, cross);                   // 新相机位叠加 → 真交叉溶解
-      if (a >= 1) { rmS.dirty = false; rmS.drawn = true; }
+      if (first) {
+        if (posterEl) posterEl.src = POSTERS[idx];
+      } else {
+        fadeEl.classList.add('on');
+        setTimeout(function () {
+          if (posterEl) posterEl.src = POSTERS[idx];
+          setTimeout(function () { fadeEl.classList.remove('on'); }, 60);
+        }, 340);
+      }
     }
     syncUI(targetP);
   }
 
-  /* ---------- 主循环（rAF 单循环） ---------- */
+  /* ---------- 主循环（rAF 单循环：无引擎渲染） ---------- */
   function loop(now) {
     rafId = window.requestAnimationFrame(loop);
     var dt = now - timeLast;
@@ -199,31 +260,39 @@
       var k = 1 - Math.exp(-(dt / 1000) * 4.5);
       curP += (targetP - curP) * k;
       if (Math.abs(targetP - curP) < 0.0004) curP = targetP;
-      NEON.tick(dt / 1000, curP);
-      NEON.render(curP, 1, false);
+      /* 视频画面层：喂阻尼进度 → 模块 scrub/seek 视频元素 */
+      if (Vid) Vid.update({
+        p: curP,
+        touring: tour.on && !tour.paused,
+        tourPaused: tour.on && tour.paused
+      });
       syncUI(curP);
       fxFrame(dt, curP, false);
+      /* 舞台微颤：幅度随滚动速度（纯显示层平移，作用于 #stage 整体；
+         由平滑速度驱动 —— 停滚即停；与穿越 shake/neon-pulse 动画天然共存） */
+      var v = clamp(speedSm / 0.55, 0, 1);
+      if (v > 0.04) {
+        clock += (dt / 1000) * v;
+        stage.style.transform = 'translate(' +
+          (Math.sin(clock * 37.7) * 0.9 * v).toFixed(2) + 'px,' +
+          (Math.cos(clock * 29.3) * 0.7 * v).toFixed(2) + 'px)';
+      } else if (stage.style.transform) {
+        stage.style.transform = '';
+      }
     } else {
-      rmFrame(dt);
+      rmFrame();
       fxFrame(dt, targetP, true);
     }
   }
 
-  /* ---------- resize 防抖重建 ---------- */
+  /* ---------- resize 防抖 ---------- */
   var resizeTimer = 0;
-  function onResize() {
-    var w = stage.clientWidth || window.innerWidth;
-    var h = stage.clientHeight || window.innerHeight;
-    NEON.resize(w, h, rm);
-    measure();
-    if (rm) { rmS.dirty = true; rmS.fade = 1; rmS.drawn = false; }
-  }
   window.addEventListener('resize', function () {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(onResize, 180);
+    resizeTimer = setTimeout(measure, 180);
   });
 
-  /* ---------- 页面不可见暂停 rAF 与声音 ---------- */
+  /* ---------- 页面不可见暂停 rAF 与声音（视频模块自管暂停/恢复） ---------- */
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) {
       if (rafId) { window.cancelAnimationFrame(rafId); rafId = 0; }
@@ -252,7 +321,7 @@
       if (SND) SND.tick();                    // P1：导航跳章 tick 音
       poke();
       b.blur();
-      window.scrollTo({ top: CH_TOPS[i] * maxScroll, behavior: rm ? 'auto' : 'smooth' });
+      window.scrollTo({ top: NAV_LAND[i] * maxScroll, behavior: rm ? 'auto' : 'smooth' });
     });
   });
   tourBtn.addEventListener('click', function () { tourBtn.blur(); toggleTour(); });
@@ -260,17 +329,50 @@
     muteBtn.addEventListener('click', function () {   // P1：静音钮（点击即手势）
       muteBtn.blur();
       soundKick();
-      if (SND && SND.hasContext()) { lastMute = SND.toggleMute(); }
-      syncMuteBtn();
+      applyMute();
     });
   }
+  if (railTrack) {
+    railTrack.addEventListener('click', function (e) {   /* 点击进度条跳转 */
+      var r = railTrack.getBoundingClientRect();
+      var p = clamp((e.clientY - r.top) / r.height, 0, 1);
+      interruptTour();
+      dismissHint();
+      soundKick();
+      if (SND) SND.tick();
+      poke();
+      window.scrollTo({ top: p * maxScroll, behavior: rm ? 'auto' : 'smooth' });
+    });
+  }
+
+  /* 首屏 hero CTA：接管自动漫游 / 滚动接管去第二章 */
+  var heroTour = document.getElementById('hero-tour');
+  var heroDown = document.getElementById('hero-down');
+  if (heroTour) heroTour.addEventListener('click', function () {
+    heroTour.blur();
+    soundKick();
+    startTour();
+  });
+  if (heroDown) heroDown.addEventListener('click', function () {
+    heroDown.blur();
+    interruptTour();
+    dismissHint();
+    soundKick();
+    poke();
+    window.scrollTo({ top: NAV_LAND[1] * maxScroll, behavior: rm ? 'auto' : 'smooth' });
+  });
 
   window.addEventListener('keydown', function (e) {
     var t = e.target, tag = t && t.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     soundKick();
     poke();
-    if (e.code === 'Space' || e.key === ' ') { e.preventDefault(); toggleTour(); return; }
+    if (e.code === 'Space' || e.key === ' ') {
+      if (tag === 'BUTTON') return;             // 交给按钮自身
+      e.preventDefault();
+      toggleTour();
+      return;
+    }
     switch (e.key) {
       case 'ArrowDown':
       case 'PageDown':
@@ -292,9 +394,7 @@
         break;
       case 'm':
       case 'M':                               /* P1：全局静音切换（有状态指示） */
-        soundKick();
-        if (SND && SND.hasContext()) { lastMute = SND.toggleMute(); }
-        syncMuteBtn();
+        applyMute();
         break;
       case 'Escape':
       case 'h':
@@ -304,25 +404,16 @@
     }
   });
 
-  /* ---------- 模式切换 ---------- */
-  function applyRM() {
-    setTourBtn();
-    if (rm) {
-      stopTour();
-      rmS.idx = -1; rmS.prev = -1; rmS.fade = 1; rmS.dirty = false; rmS.drawn = false;
-    } else {
-      curP = targetP;
-    }
-    onResize();
-  }
-  if (rmMQ.addEventListener) rmMQ.addEventListener('change', function (e) { rm = e.matches; applyRM(); });
-  else if (rmMQ.addListener) rmMQ.addListener(function (e) { rm = e.matches; applyRM(); });
+  /* ---------- 模式切换（reduced-motion：重载进静态模式，保证模块干净禁用） ---------- */
+  if (rmMQ.addEventListener) rmMQ.addEventListener('change', function () { window.location.reload(); });
+  else if (rmMQ.addListener) rmMQ.addListener(function () { window.location.reload(); });
 
   /* ---------- 启动 ---------- */
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   window.scrollTo(0, 0);
-  NEON.init(canvas, stage.clientWidth || window.innerWidth, stage.clientHeight || window.innerHeight, rm);
   measure();
+  if (rm) document.body.classList.add('reduced');
+  if (Vid) Vid.init({ reduced: rm });        /* reduced：模块禁用，静态模式用海报 */
   setTourBtn();
   syncMuteBtn();                              /* P1：静音钮初始状态 */
   window.addEventListener('load', measure);
