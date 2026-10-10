@@ -90,8 +90,22 @@
   }
 
   /* ================= rAF 主循环 ================= */
+  var frameArmored = 0;
   function frame(ts) {
     if (!st.running) return;
+    st.raf = win.requestAnimationFrame(frame);       /* 先排下一帧：循环体内任何异常都不再杀死主循环 */
+    try { frameBody(ts); }
+    catch (eAll) {
+      frameArmored++;
+      if (typeof window !== 'undefined') {
+        window.__astraFrameErrs = window.__astraFrameErrs || [];
+        if (window.__astraFrameErrs.length < 5) {
+          window.__astraFrameErrs.push(String(eAll && eAll.stack || eAll).slice(0, 300));
+        }
+      }
+    }
+  }
+  function frameBody(ts) {
     var dt = st.lastTs ? Math.max(0, Math.min(0.05, (ts - st.lastTs) / 1000)) : 0.016;
     st.lastTs = ts;
 
@@ -132,6 +146,23 @@
       }
     }
 
+    /* 3.5) 惯性滑行：输入给动量，页面带视频自动前进/后退；衰减停止后关键帧磁吸 */
+    if (Math.abs(iner.v) > 0.0002 && !st.tour.on && !st.glide.on && !st.reduced) {
+      iner.v *= Math.exp(-dt * 2.4);
+      var np = clamp(st.target + iner.v * dt, 0, 1);
+      if (np <= 0 || np >= 1) iner.v = 0;
+      win.scrollTo(0, np * st.scrollable);
+      if (Math.abs(iner.v) < 0.02) {
+        iner.v = 0;
+        var bestR = 0, bdR = 1;                      /* 末段磁吸：轻轻停靠最近章界 */
+        for (var ri = 0; ri < REST.length; ri++) {
+          var dd = Math.abs(st.target - REST[ri]);
+          if (dd < bdR) { bdR = dd; bestR = REST[ri]; }
+        }
+        if (bdR > 0.0004 && bdR < 0.05) glideTo(bestR * st.scrollable, 420 + bdR * 2600);
+      }
+    }
+
     /* 4) 阻尼插值 + 运动时钟（停止滚动 -> 画面停止） */
     var prev = st.current;
     st.current += (st.target - st.current) * (1 - Math.exp(-dt * 3.4));
@@ -152,12 +183,12 @@
 
     /* 6) P1 反馈层：HUD / 穿越门控 / 待机提示 / 声音速度调制 */
     var spdN = clamp(st.speed / 0.22, 0, 1);           /* 归一化滚动速度 */
-    if (Aud) Aud.setSpeed(spdN);
-    if (Hud) Hud.update({
+    try { if (Aud) Aud.setSpeed(spdN); } catch (eAud) {}
+    try { if (Hud) Hud.update({
       p: st.current, speed: spdN, dt: dt, clock: st.clock,
       touring: st.tour.on && !st.tour.paused, gliding: st.glide.on,
       introDone: hintGone
-    });
+    }); } catch (eHud) {}
     /* 速度响应：舞台微颤幅度随滚动速度（纯显示层平移；由运动时钟驱动 —— 停滚即停） */
     var jk = spdN;
     if (jk > 0.04) {
@@ -168,7 +199,6 @@
       stage.style.transform = '';
     }
 
-    st.raf = win.requestAnimationFrame(frame);
   }
 
   /* ================= DOM 更新（导航高亮 / 标题淡入淡出 / 进度条） ================= */
@@ -287,8 +317,30 @@
   }
   function interruptTour() { if (st.tour.on) endTour(); }
 
-  win.addEventListener('wheel', userAct, { passive: true });
-  win.addEventListener('touchstart', userAct, { passive: true });
+  /* ============ 惯性播放层：一次输入 → 自动滑行一段（解决"停止输入即冻结"） ============ */
+  var REST = [0, CH1_END, CH2_END, 1];              /* 磁吸停靠点：章界关键帧 */
+  var iner = { v: 0 };                              /* 时间轴速度（进度/秒） */
+  win.addEventListener('wheel', function (e) {
+    if (st.reduced) return;
+    e.preventDefault();                             /* 滚动完全由惯性层接管（滚动条拖动不受影响） */
+    userAct();
+    var d = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 100 : 1);
+    iner.v = clamp(iner.v + d * 0.00058, -0.24, 0.24);
+  }, { passive: false });
+  var tT = 0, tY = 0, tV = 0;                       /* 触摸惯性：末速度 → 动量 */
+  win.addEventListener('touchstart', function (e) {
+    userAct();
+    iner.v = 0;
+    tT = performance.now(); tY = e.touches[0].clientY; tV = 0;
+  }, { passive: true });
+  win.addEventListener('touchmove', function (e) {
+    var t = performance.now(), y = e.touches[0].clientY;
+    if (t > tT) tV = (tY - y) / (t - tT);           /* px/ms，向下为正 */
+    tT = t; tY = y;
+  }, { passive: true });
+  win.addEventListener('touchend', function () {
+    if (tV > 0.12) iner.v = clamp(iner.v + tV * 0.0012, -0.32, 0.32);
+  }, { passive: true });
 
   win.addEventListener('keydown', function (e) {
     var key = e.key;
@@ -313,8 +365,8 @@
       return;
     }
     var step = 0;
-    if (key === 'ArrowDown') step = 0.045;
-    else if (key === 'ArrowUp') step = -0.045;
+    if (key === 'ArrowDown') step = 0.055;
+    else if (key === 'ArrowUp') step = -0.055;
     else if (key === 'PageDown') step = 0.2;
     else if (key === 'PageUp') step = -0.2;
     else if (key === 'Home') { e.preventDefault(); userAct(); glideTo(0, 900); return; }
@@ -322,7 +374,7 @@
     if (step !== 0) {
       e.preventDefault();
       userAct();
-      win.scrollBy({ top: step * st.scrollable, behavior: 'smooth' });
+      iner.v = clamp(iner.v + step, -0.3, 0.3);     /* 键盘也给动量脉冲 */
     }
   });
 
@@ -351,16 +403,10 @@
 
   /* 首屏 hero CTA：接管自动漫游 / 提示滚动接管 */
   var heroTour = doc.getElementById('hero-tour');
-  var heroDown = doc.getElementById('hero-down');
   if (heroTour) heroTour.addEventListener('click', function () {
     heroTour.blur();
     if (Aud) Aud.unlock();
     startTour();
-  });
-  if (heroDown) heroDown.addEventListener('click', function () {
-    heroDown.blur();
-    userAct();
-    glideToChapter(1);
   });
 
   /* ================= 页面不可见时暂停 rAF ================= */
@@ -456,7 +502,16 @@
     } else {
       st.running = true;
       st.lastTs = 0;
-      st.raf = win.requestAnimationFrame(frame);
+    /* 心跳看门狗：任何原因（后台加载丢事件/异常/节流）导致循环停摆，
+     * 页面可见时 1.5s 内自动复活——主循环永不永久死亡 */
+    win.setInterval(function () {
+      if (!st.reduced && !st.running && !doc.hidden) {
+        st.running = true;
+        st.lastTs = 0;
+        st.raf = win.requestAnimationFrame(frame);
+      }
+    }, 1500);
+    st.raf = win.requestAnimationFrame(frame);
     }
     var rm = win.matchMedia('(prefers-reduced-motion: reduce)');
     if (rm.addEventListener) rm.addEventListener('change', function () { win.location.reload(); });

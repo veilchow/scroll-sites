@@ -255,6 +255,24 @@
     if (!(dt > 0) || dt > 80) dt = 16.7;
     readTarget();
     tourTick(dt);
+    /* 惯性滑行：带视频自动前进/后退，衰减停止后关键帧磁吸 */
+    if (Math.abs(iner.v) > 0.0002 && !tour.on && !rm) {
+      iner.v *= Math.exp(-(dt / 1000) * 2.4);
+      var np = clamp(targetP + iner.v * (dt / 1000), 0, 1);
+      if (np <= 0 || np >= 1) iner.v = 0;
+      window.scrollTo(0, np * maxScroll);
+      if (Math.abs(iner.v) < 0.02) {
+        iner.v = 0;
+        var bestR = 0, bdR = 1;
+        for (var ri = 0; ri < REST.length; ri++) {
+          var dd = Math.abs(targetP - REST[ri]);
+          if (dd < bdR) { bdR = dd; bestR = REST[ri]; }
+        }
+        if (bdR > 0.0004 && bdR < 0.05) {
+          window.scrollTo({ top: bestR * maxScroll, behavior: 'smooth' });
+        }
+      }
+    }
     if (!rm) {
       /* 轻微阻尼缓动：当前进度向目标插值，上滚回退、停滚即停 */
       var k = 1 - Math.exp(-(dt / 1000) * 4.5);
@@ -309,8 +327,30 @@
     if ((window.scrollY || 0) > 30) dismissHint();
     poke();
   }, { passive: true });
-  window.addEventListener('wheel', function () { interruptTour(); dismissHint(); soundKick(); poke(); }, { passive: true });
-  window.addEventListener('touchstart', function () { interruptTour(); dismissHint(); soundKick(); poke(); }, { passive: true });
+  /* ---------- 惯性播放层：一次输入 → 自动滑行一段（衰减 + 关键帧磁吸） ---------- */
+  var REST = [0, 1 / 3, 2 / 3, 1];                  /* 磁吸停靠点：章界关键帧 */
+  var iner = { v: 0 };                              /* 时间轴速度（进度/秒） */
+  window.addEventListener('wheel', function (e) {
+    if (rm) return;
+    e.preventDefault();                             /* 滚动由惯性层接管（滚动条拖动不受影响） */
+    interruptTour(); dismissHint(); soundKick(); poke();
+    var d = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 100 : 1);
+    iner.v = clamp(iner.v + d * 0.00058, -0.24, 0.24);
+  }, { passive: false });
+  var tT = 0, tY = 0, tV = 0;
+  window.addEventListener('touchstart', function (e0) {
+    interruptTour(); dismissHint(); soundKick(); poke();
+    iner.v = 0;
+    tT = performance.now(); tY = e0.touches[0].clientY; tV = 0;
+  }, { passive: true });
+  window.addEventListener('touchmove', function (e0) {
+    var t = performance.now(), y = e0.touches[0].clientY;
+    if (t > tT) tV = (tY - y) / (t - tT);
+    tT = t; tY = y;
+  }, { passive: true });
+  window.addEventListener('touchend', function () {
+    if (tV > 0.12) iner.v = clamp(iner.v + tV * 0.0012, -0.32, 0.32);
+  }, { passive: true });
   window.addEventListener('pointerdown', function () { soundKick(); poke(); }, { passive: true });
 
   navBtns.forEach(function (b, i) {
@@ -345,21 +385,12 @@
     });
   }
 
-  /* 首屏 hero CTA：接管自动漫游 / 滚动接管去第二章 */
+  /* 首屏 hero CTA：开始旅程（任何输入自动接管） */
   var heroTour = document.getElementById('hero-tour');
-  var heroDown = document.getElementById('hero-down');
   if (heroTour) heroTour.addEventListener('click', function () {
     heroTour.blur();
     soundKick();
     startTour();
-  });
-  if (heroDown) heroDown.addEventListener('click', function () {
-    heroDown.blur();
-    interruptTour();
-    dismissHint();
-    soundKick();
-    poke();
-    window.scrollTo({ top: NAV_LAND[1] * maxScroll, behavior: rm ? 'auto' : 'smooth' });
   });
 
   window.addEventListener('keydown', function (e) {
@@ -377,12 +408,12 @@
       case 'ArrowDown':
       case 'PageDown':
         e.preventDefault(); interruptTour(); dismissHint();
-        window.scrollBy({ top: window.innerHeight * (e.key === 'PageDown' ? 0.95 : 0.33), behavior: rm ? 'auto' : 'smooth' });
+        iner.v = clamp(iner.v + (e.key === 'PageDown' ? 0.2 : 0.055), -0.3, 0.3);
         break;
       case 'ArrowUp':
       case 'PageUp':
         e.preventDefault(); interruptTour(); dismissHint();
-        window.scrollBy({ top: -window.innerHeight * (e.key === 'PageUp' ? 0.95 : 0.33), behavior: rm ? 'auto' : 'smooth' });
+        iner.v = clamp(iner.v - (e.key === 'PageUp' ? 0.2 : 0.055), -0.3, 0.3);
         break;
       case 'Home':
         e.preventDefault(); interruptTour();
@@ -419,4 +450,13 @@
   window.addEventListener('load', measure);
   timeLast = performance.now();
   rafId = window.requestAnimationFrame(loop);
+
+  /* 心跳看门狗：任何原因（后台加载丢 visibility 事件等）导致循环停摆，
+   * 页面可见时 1.5s 内自动复活——主循环永不永久死亡 */
+  setInterval(function () {
+    if (!rm && !rafId && !document.hidden) {
+      timeLast = performance.now();
+      rafId = window.requestAnimationFrame(loop);
+    }
+  }, 1500);
 })();

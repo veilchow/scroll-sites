@@ -125,6 +125,7 @@
   .hero-cta button .i{margin:0 8px 0 0;color:var(--cyan)}
   .hero-cta button:last-child .i{margin:0 0 0 8px}
   .hero-cta button:hover{border-color:var(--cyan);box-shadow:0 0 24px rgba(120,210,255,.25);transform:translateY(-1px)}
+  .hero-alt{align-self:center;font-size:11px;letter-spacing:.14em;color:var(--mut)}
   .hero-meta{margin-top:20px;font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--mut)}
   body.reduced .title{transition:opacity .5s ease,transform .5s ease}
   body.reduced .title.active{opacity:1;transform:none}
@@ -240,7 +241,7 @@
   #lockbox::after{right:-4px;bottom:-4px;border-left:0;border-top:0}
 
   /* 穿越时刻：色温 flash（200ms）+ 画面微震（±2px / 150ms） */
-  #flash{position:absolute;inset:0;opacity:0;pointer-events:none;z-index:6}
+  #flash{display:none;position:absolute;inset:0;opacity:0;pointer-events:none;z-index:6}
   #flash.flash-a{background:radial-gradient(circle at 50% 50%,rgba(238,250,255,.95) 0%,rgba(130,215,255,.55) 42%,rgba(130,215,255,0) 74%)}
   #flash.flash-b{background:radial-gradient(circle at 50% 46%,rgba(255,244,222,.92) 0%,rgba(255,180,94,.5) 40%,rgba(255,180,94,0) 72%)}
   #flash.on{animation:hud-flash .2s ease-out}
@@ -303,7 +304,7 @@
     /* P1 反馈层：无微震无 sting，HUD 切换用淡入淡出（无脉冲/闪烁动画） */
     #idle-hint.on,#hud-sync.pulse,.hud-cluster.boot,.hud-dot.docking,
     #hud-type.typing::after,#flash.on{animation:none}
-    #flash{display:none}
+    #flash{display:none;display:none}
     .hud-cluster{transform:none;transition:opacity .5s ease}
   }
 
@@ -319,7 +320,8 @@
     .hero .t-sub{display:block;font-size:12px;line-height:1.8;max-width:34ch}
     .hero-cta{margin-top:18px;gap:10px}
     .hero-cta button{padding:10px 15px;font-size:11px;letter-spacing:.12em}
-    .hero-meta{font-size:9px;letter-spacing:.14em;margin-top:14px;max-width:90vw}
+    .hero-alt{align-self:center;font-size:11px;letter-spacing:.14em;color:var(--mut)}
+  .hero-meta{font-size:9px;letter-spacing:.14em;margin-top:14px;max-width:90vw}
     .track{height:24vh}
     #progress{right:10px}
     #tour-btn{right:12px;bottom:64px;padding:8px 13px;font-size:11px}
@@ -379,8 +381,8 @@
     <h1 class="t-main">出发，去寂静深处。</h1>
     <p class="t-sub">远航船「辰星」已航行一百一十二年，目的地是一座久未应答的信标站。滚动滚轮接管驾驶——往下是接近，往上是回望。</p>
     <div class="hero-cta">
-      <button id="hero-tour" type="button"><span class="i">▶</span>开始自动漫游</button>
-      <button id="hero-down" type="button">滚动接管 · 继续接近<span class="i">↓</span></button>
+      <button id="hero-tour" type="button"><span class="i">▶</span>开始旅程</button>
+      <span class="hero-alt">或随时滚动 / 滑动，惯性接管</span>
     </div>
     <p class="hero-meta">三章旅程 · 航程 120.0 KM · 建议开启声音（点击任意处激活 · M 静音 · H 口播模式）</p>
   </section>

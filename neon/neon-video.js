@@ -277,6 +277,25 @@
   }
 
   /* ---------------- 自动漫游：三段 unmuted 顺序连播接管漫游节奏 ---------------- */
+  /* 播放与自动播放策略兜底：未挂用户手势时 unmuted play 可能被拒——
+   * 降级 muted 重试（声音由 WebAudio 音床继续承担），两次都失败才回匀速漫游 */
+  function tryPlay(seg, ci) {
+    var pr = seg.el.play();
+    if (pr && pr.catch) pr.catch(function () {
+      if (!seg.el.muted) {
+        seg.el.muted = true;
+        var p2 = seg.el.play();
+        if (p2 && p2.catch) p2.catch(function () {
+          seg.playFail = true;
+          if (st.engaged === ci) releaseEngaged();
+        });
+      } else {
+        seg.playFail = true;
+        if (st.engaged === ci) releaseEngaged();
+      }
+    });
+  }
+
   function releaseEngaged() {
     if (st.engaged < 0) return;
     var seg = segs[st.engaged];
@@ -303,16 +322,11 @@
         try { seg.el.currentTime = t0; } catch (e) {}
         seg.want = t0;
       }
-      var pr = seg.el.play();
-      if (pr && pr.catch) pr.catch(function () {
-        seg.playFail = true;                          /* 自动播放被拒 → 回匀速漫游 */
-        if (st.engaged === ci) releaseEngaged();
-      });
+      tryPlay(seg, ci);                               /* 原声 play 被自动播放策略拒 → 降级 muted 重试，漫游不断 */
     } else {
       seg.el.muted = st.muted;
       if (seg.el.paused && !seg.el.ended) {           /* 漫游恢复 / 页面切回前台 */
-        var pr2 = seg.el.play();
-        if (pr2 && pr2.catch) pr2.catch(function () { seg.playFail = true; });
+        tryPlay(seg, ci);
       }
     }
     return logic.tourP(seg.span, seg.dur, seg.el.currentTime);
