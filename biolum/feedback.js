@@ -1,10 +1,16 @@
 /* ============================================================
- * BIOLUM 蓝眼泪 — feedback.js（模板派生）
- * 依 ../INTERACTION-DESIGN.md §2：
- *   计量 HUD（海拔计/街道定位/楼层翻牌/温度/距离倒数/抵达）
- *   穿越时刻 C（33% 穿云落地）/ D（66% 沉入地下）的
- *     HUD 单位切换动画 + 霓虹饱和度脉冲 + 色温 flash + 微震
- *   待机呼吸提示（按章变化文案）
+ * BIOLUM 蓝眼泪 — feedback.js（模板派生，内容按 PLAN-DESIGN §1.3/§1.5 题材化）
+ * 计量 HUD 四计量（机制外壳继承自模板）：
+ *   CH1 潮汐时钟 19:42→21:17（HH:MM 翻牌感）+ 追光步速 0-88 步/分（速度联动）
+ *   CH2 发光指数 0→100% + 夜光藻爆发等级 Ⅰ-Ⅴ（阈值跳变）+ 双筒望远镜
+ *   CH3 水下深度 0.0→8.0m（p≥71.7% 破水激活走数 + ±0.1m 悬浮呼吸漂移）
+ *     + 爆发等级翻牌（Ⅰ→Ⅴ 定格奖牌）+ 双态温度 气温22°→水温18° + 抵达
+ * 穿越时刻（门控 33%/66% 位置继承，与视频接缝对齐）：
+ *   T1 夜幕初光（id 0）：sting + bio 饱和度脉冲 + 冷色 flash + 微震 +
+ *     HUD 翻滚退场 + 望远镜收起编舞（land→folded 两段式，时序继承）
+ *   T2 破水入水（id 1）：sting + 暖色 flash + 微震 + HUD 翻滚退场 +
+ *     爆发等级翻牌（60ms 起翻 + 520ms 第二声咔哒）+ 双态温度滚动
+ *   破水峰值 p=71.7%：深度计灰→亮点亮 + 深青 flash（DET 内部探测器）
  * 结构：
  *   BIOFX.core —— 纯函数核心（Node 桩可测：插值/章界去重/速度映射）
  *   BIOFX.init/update/transit/onActivity —— DOM HUD 驱动（app.js 调用）
@@ -20,22 +26,29 @@ window.BIOFX = (function () {
   /* ============================================================
    * 纯核心（Node 桩测试直接驱动，无 DOM 依赖）
    * ============================================================ */
-  var B1 = 1 / 3, B2 = 2 / 3;                 // 章界 33% / 66%
-  var ALT0 = 480, ALT1 = 30;                  // SEG1 海拔 480m → 30m（落地）
-  var DOOR0 = 7, DOOR1 = 19;                  // SEG2 门牌 路口07 → 19
-  var STEPS_END = 486;                        // SEG2 步数（行程映射）
-  var DIST0 = 12;                             // SEG3 距核心面档 12m → 0m
-  var T_SURF = 12, T_UND = 18;                // 地表 12° → 地下 18°
+  var B1 = 1 / 3, B2 = 2 / 3;                 // 章界 33% / 66%（继承）
+  var TIDE0 = 1182, TIDE1 = 1277;             // SEG1 潮汐时刻 19:42 → 21:17（满潮定格；当日分钟数）
+  var GLOW0 = 0, GLOW1 = 100;                 // SEG2 发光指数 0% → 100%
+  var BURST_TH = [20, 40, 60, 80];            // 爆发等级阈值（发光指数 %处跳级）
+  var BURST_LV = ['Ⅰ SPARK', 'Ⅱ RIPPLE', 'Ⅲ SURGE', 'Ⅳ BLOOM', 'Ⅴ SEA OF LIGHT'];
+  var DEPTH1 = 8;                             // SEG3 水下深度 0.0 → 8.0 m（递增）
+  var DEPTH_ON = 0.717;                       // 破水激活位（v3 片内 t≈1.0s 的确定性映射）
+  var T_AIR = 22, T_WATER = 18;               // 双态温度：气温 22° → 水温 18°
   var HYST = 0.015;                           // 章界触发滞回窗（±1.5%）
 
   function segT(p, lo, hi) { return clamp((p - lo) / (hi - lo), 0, 1); }
 
-  function altitudeAt(p) { return lerp(ALT0, ALT1, segT(p, 0, B1)); }
-  function doorAt(p) { return DOOR0 + Math.round((DOOR1 - DOOR0) * segT(p, B1, B2)); }
-  function stepsAt(p) { return Math.round(STEPS_END * segT(p, B1, B2)); }
-  function distAt(p) { return DIST0 * (1 - segT(p, B2, 1)); }
-  /* 垂直速度显示（m/s）：真实导数 1350·(进度/秒) 数值失控，
-     用平方压缩映射到 0–88 m/s 的可信下坠区间，仍严格随滚动速度单调 */
+  function tideAt(p) { return Math.round(lerp(TIDE0, TIDE1, segT(p, 0, B1))); }   // 分钟数
+  function fmtTide(m) { return pad2(Math.floor(m / 60)) + ':' + pad2(m % 60); }   // HH:MM 车站翻页钟
+  function glowAt(p) { return Math.round(lerp(GLOW0, GLOW1, segT(p, B1, B2))); }  // 发光指数 %
+  function burstAt(p) {                                                        // 爆发等级 0-4（阈值跳变，非累加计数）
+    var g = glowAt(p), lv = 0;
+    for (var i = 0; i < BURST_TH.length; i++) { if (g >= BURST_TH[i]) lv = i + 1; }
+    return lv;
+  }
+  function depthAt(p) { return lerp(0, DEPTH1, segT(p, B2, 1)); }                // 深度 m 递增（同 altitudeAt 结构）
+  /* 追光步速（步/分）：公式与封顶值继承零改动（0-88 平方压缩可信区间，
+     严格随滚动速度单调、有界）；停滚随惯性衰减回 0 */
   function vspeedOf(sps) { return Math.min(88, 27 * Math.sqrt(Math.max(0, sps) * 13.5)); }
   function chapterOf(p) { return p < B1 ? 0 : p < B2 ? 1 : 2; }
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
@@ -59,9 +72,10 @@ window.BIOFX = (function () {
 
   var core = {
     B1: B1, B2: B2,
-    ALT0: ALT0, ALT1: ALT1, DOOR0: DOOR0, DOOR1: DOOR1,
-    DIST0: DIST0, T_SURF: T_SURF, T_UND: T_UND,
-    altitudeAt: altitudeAt, doorAt: doorAt, stepsAt: stepsAt, distAt: distAt,
+    TIDE0: TIDE0, TIDE1: TIDE1, GLOW0: GLOW0, GLOW1: GLOW1,
+    BURST_TH: BURST_TH, BURST_LV: BURST_LV, DEPTH1: DEPTH1, DEPTH_ON: DEPTH_ON,
+    T_AIR: T_AIR, T_WATER: T_WATER,
+    tideAt: tideAt, fmtTide: fmtTide, glowAt: glowAt, burstAt: burstAt, depthAt: depthAt,
     vspeedOf: vspeedOf, chapterOf: chapterOf, pad2: pad2,
     makeTransitDetector: makeTransitDetector
   };
@@ -77,7 +91,7 @@ window.BIOFX = (function () {
   var lastAct = 0;           // 最近一次输入（performance.now()；0=尚无）
   var idleOn = false;
   var timers = [];
-  var last = { alt: '', vs: '', door: '', steps: '', dist: '', hudSpd: -1 };
+  var last = { tide: '', vs: '', glow: '', burst: '', depth: '', depthOn: false, hudSpd: -1 };
 
   function isRM() { return !!(opts && opts.rm && opts.rm()); }
 
@@ -89,9 +103,10 @@ window.BIOFX = (function () {
     E = {
       hud: q('hud'),
       groups: [q('hud-seg1'), q('hud-seg2'), q('hud-seg3')],
-      alt: q('hud-alt'), vs: q('hud-vs'),
-      door: q('hud-door'), steps: q('hud-steps'), umb: q('umb'),
-      dist: q('hud-dist'), floor: q('hud-floor'), temp: q('hud-temp'),
+      tide: q('hud-tide'), vs: q('hud-vs'),
+      glow: q('hud-glow'), burst: q('hud-burst'), bino: q('bino'),
+      depth: q('hud-depth'), depthBig: q('hud-depth-big'),
+      floor: q('hud-floor'), temp: q('hud-temp'),
       arrive: q('hud-arrive'),
       idle: q('idle-hint'),
       stage: q('stage'),
@@ -135,13 +150,16 @@ window.BIOFX = (function () {
     inG.classList.remove('in', 'roll-out');
     void inG.offsetWidth;                      // 重启入场动画
     inG.classList.add('active', 'in');
-    if (ch < prev) { resetTransients(); }      // 回退方向：复位伞/翻牌/温度，供下次正向穿越重放
+    if (ch < prev) { resetTransients(); }      // 回退方向：复位翻牌/望远镜/温度/深度计，供下次正向穿越重放
   }
 
   function resetTransients() {
     if (E.floor) E.floor.classList.remove('b2');
-    if (E.umb) E.umb.classList.remove('folded', 'land');
-    if (E.temp) E.temp.textContent = '地表 ' + T_SURF + '°';
+    if (E.bino) E.bino.classList.remove('folded', 'land');
+    if (E.temp) E.temp.textContent = '气温 ' + T_AIR + '°';
+    if (E.depthBig) E.depthBig.classList.remove('on');
+    last.depth = '';
+    last.depthOn = false;
     stopTempAnim();
   }
 
@@ -151,7 +169,7 @@ window.BIOFX = (function () {
     var st = E.stage;
     if (kind === 'shake') { st.classList.remove('shake'); void st.offsetWidth; st.classList.add('shake'); }
     if (kind === 'bio') { st.classList.remove('bio-pulse'); void st.offsetWidth; st.classList.add('bio-pulse'); }
-    if ((kind === 'cool' || kind === 'warm') && E.flash) {
+    if ((kind === 'cool' || kind === 'warm' || kind === 'deep') && E.flash) {
       var f = E.flash;
       f.className = '';
       void f.offsetWidth;
@@ -160,14 +178,14 @@ window.BIOFX = (function () {
     }
   }
 
-  /* ---------- 伞：落地收起（CSS transform 过渡；RM 瞬时到位） ---------- */
-  function landUmbrella() {
-    if (!E.umb) return;
-    E.umb.classList.add('land');
-    later(function () { E.umb.classList.add('folded'); }, 240);   // 下落触地 → 收伞
+  /* ---------- 望远镜：夜幕落下收起（CSS transform 过渡；RM 瞬时到位） ---------- */
+  function foldBinoculars() {
+    if (!E.bino) return;
+    E.bino.classList.add('land');
+    later(function () { E.bino.classList.add('folded'); }, 240);   // 触地 → 收拢挂回身侧
   }
 
-  /* ---------- 楼层翻牌 B1→B2（rotateX 整牌机械翻转 + 两声咔哒） ---------- */
+  /* ---------- 爆发等级翻牌 Ⅰ→Ⅴ（rotateX 整牌机械翻转 + 两声咔哒） ---------- */
   function playFlip() {
     if (!E.floor) return;
     var fl = E.floor;
@@ -180,38 +198,38 @@ window.BIOFX = (function () {
     }, 60);
   }
 
-  /* ---------- 温度 12°→18°（数字滚动 + 标签切换） ---------- */
+  /* ---------- 双态温度 气温22°→水温18°（数字滚动 + 标签切换） ---------- */
   var tempTimer = 0;
   function stopTempAnim() { if (tempTimer) { clearInterval(tempTimer); tempTimer = 0; } }
   function animTemp() {
     if (!E.temp) return;
-    if (isRM()) { E.temp.textContent = '地下 ' + T_UND + '°'; return; }
+    if (isRM()) { E.temp.textContent = '水温 ' + T_WATER + '°'; return; }
     var el = E.temp, t0 = performance.now();
     stopTempAnim();
     tempTimer = setInterval(function () {
       var k = clamp((performance.now() - t0 - 500) / 900, 0, 1);   // 翻牌后再滚温
-      var v = Math.round(lerp(T_SURF, T_UND, k));
-      el.textContent = (k < 0.5 ? '地表 ' : '地下 ') + v + '°';
+      var v = Math.round(lerp(T_AIR, T_WATER, k));
+      el.textContent = (k < 0.5 ? '气温 ' : '水温 ') + v + '°';
       if (k >= 1) stopTempAnim();
     }, 40);
   }
 
-  /* ---------- 穿越时刻（app.js 在进度越界瞬间调用；id 0=C 1=D） ---------- */
+  /* ---------- 穿越时刻（app.js 在进度越界瞬间调用；id 0=T1 1=T2） ---------- */
   function transit(id) {
     if (!E) return;
     if (isRM()) return;                          // RM：无 sting 无动画，update 的淡切已足够
     clearTimers();
     stopTempAnim();
     if (id === 0) {
-      /* C · 穿云落地：雨声音量跳升(sting) + 霓虹饱和度脉冲 + 冷色 flash + 微震
-         HUD：海拔计翻滚退场(240ms) → 街道定位淡入 + 伞收起 */
+      /* T1 · 夜幕初光：点亮 sting + bio 饱和度脉冲 + 冷色 flash + 微震
+         HUD：潮汐时钟翻滚退场(240ms) → 发光指数淡入 + 望远镜收起 */
       if (opts && opts.onSting) opts.onSting(0);
       stageFX('bio'); stageFX('cool'); stageFX('shake');
       setChapter(1, 240);
-      landUmbrella();
+      foldBinoculars();
     } else if (id === 1) {
-      /* D · 沉入地下：雨声闷掉(sting) + 冷→暖 flash + 微震
-         HUD：门牌退场 → 楼层翻牌 B1→B2 + 温度 12°→18° */
+      /* T2 · 破水入水：骤闷 sting + 暖色 flash + 微震
+         HUD：发光指数退场 → 爆发等级翻牌 Ⅰ→Ⅴ + 温度 气温22°→水温18° */
       if (opts && opts.onSting) opts.onSting(1);
       stageFX('warm'); stageFX('shake');
       setChapter(2, 240);
@@ -220,7 +238,7 @@ window.BIOFX = (function () {
     }
   }
 
-  /* ---------- 抵达（SEG3 尾端 0m） ---------- */
+  /* ---------- 抵达（SEG3 尾端 8m 悬浮稳住） ---------- */
   function updateArrive(p) {
     if (!E.arrive) return;
     if (p >= 0.995 && !arriveLit) {
@@ -243,13 +261,24 @@ window.BIOFX = (function () {
 
     /* 计量数字（只写变化的 DOM） */
     if (ch === 0) {
-      setText(E.alt, altitudeAt(p).toFixed(1), 'alt');
-      setText(E.vs, vspeedOf(sps).toFixed(1), 'vs');
+      setText(E.tide, fmtTide(tideAt(p)), 'tide');
+      setText(E.vs, '' + Math.round(vspeedOf(sps)), 'vs');
     } else if (ch === 1) {
-      setText(E.door, pad2(doorAt(p)), 'door');
-      setText(E.steps, '' + stepsAt(p), 'steps');
+      setText(E.glow, '' + glowAt(p), 'glow');
+      setText(E.burst, BURST_LV[burstAt(p)], 'burst');
     } else {
-      setText(E.dist, distAt(p).toFixed(1), 'dist');
+      /* 深度计：p<71.7% 灰待命 0.0；破水点亮走数；停滚时 ±0.1m 悬浮呼吸漂移 */
+      var on = p >= DEPTH_ON;
+      if (on !== last.depthOn) {
+        last.depthOn = on;
+        if (E.depthBig) E.depthBig.classList.toggle('on', on);
+        if (on) stageFX('deep');                 // 破水瞬间：数字点亮 + 深青 flash
+      }
+      var dv = on ? depthAt(p) : 0;
+      if (on && sps < 0.004) {
+        dv += 0.1 * Math.sin((typeof performance !== 'undefined' ? performance.now() : Date.now()) / 900);
+      }
+      setText(E.depth, dv.toFixed(1), 'depth');
     }
     updateArrive(p);
 
@@ -266,7 +295,7 @@ window.BIOFX = (function () {
       !(o && o.tour) && p < 0.99;
     if (showIdle && !idleOn) {
       idleOn = true;
-      E.idle.textContent = ['继续下落 ↓', '继续前行 ↓', '再往下 ↓'][ch];
+      E.idle.textContent = ['一晚能看到满海发光的人，不到一船 ↓', '夜光藻要被浪惊扰，才肯发光 ↓', '这片光，只亮给今晚的潮水 ↓'][ch];
       E.idle.classList.add('on');
     } else if (!showIdle && idleOn) {
       idleOn = false;

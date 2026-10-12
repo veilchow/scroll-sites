@@ -3,35 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#04030c">
-<meta name="description" content="BIOLUM 蓝眼泪 —— 滚动驱动的叙事网站（模板派生，文案 Phase 2 替换）">
+<meta name="theme-color" content="#03121f">
+<meta name="description" content="蓝眼泪 BIOLUMINESCE —— 滚动驱动的叙事网站：从黄昏海边小镇等来夜幕落下时的第一道蓝眼泪，看整片海苏醒发光，再潜进一片会游泳的星河。">
 <link rel="icon" href="data:,">
-<link rel="preload" as="image" href="assets/keys2/k1.png">
-<title>BIOLUM · 蓝眼泪</title>
+<link rel="preload" as="image" href="assets/keys/k1.png">
+<title>蓝眼泪 BIOLUMINESCE · 追光一夜</title>
 <style>
 :root{
-  --mag:#ff2d95;
-  --cyn:#26e6ff;
-  --pur:#8b5cf6;
-  --warm:#ffb454;
-  --ink:#e9e6f7;
-  --dim:rgba(233,230,247,.55);
+  --mag:#1e6fd9;
+  --cyn:#3df0c8;
+  --pur:#2b5f8f;
+  --warm:#ff9e6d;
+  --ink:#e8f5f1;
+  --dim:rgba(232,245,241,.55);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:auto}
 body{
   margin:0;
-  background:#04030c;
+  background:#03121f;
   color:var(--ink);
   font-family:"Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans SC",system-ui,sans-serif;
   overflow-x:hidden;
 }
-::selection{background:rgba(255,45,149,.4)}
+::selection{background:rgba(30,111,217,.4)}
 ::-webkit-scrollbar{width:10px;height:10px}
-::-webkit-scrollbar-track{background:#070512}
-::-webkit-scrollbar-thumb{background:#2a1a52;border-radius:6px;border:2px solid #070512}
-::-webkit-scrollbar-thumb:hover{background:#43307a}
-html{scrollbar-color:#2a1a52 #070512;scrollbar-width:thin}
+::-webkit-scrollbar-track{background:#050e18}
+::-webkit-scrollbar-thumb{background:#17435c;border-radius:6px;border:2px solid #050e18}
+::-webkit-scrollbar-thumb:hover{background:#1f5a7a}
+html{scrollbar-color:#17435c #050e18;scrollbar-width:thin}
 
 /* 滚动轨道：撑出约 7 屏的滚动距离（总高 8 屏视口） */
 #spacer{height:800vh;height:800svh}
@@ -44,7 +44,7 @@ html{scrollbar-color:#2a1a52 #070512;scrollbar-width:thin}
   height:100vh;
   height:100svh;
   overflow:hidden;
-  background:#04030c;
+  background:#03121f;
   isolation:isolate;
   z-index:0;
 }
@@ -54,8 +54,8 @@ html{scrollbar-color:#2a1a52 #070512;scrollbar-width:thin}
   object-fit:cover;object-position:50% 50%;display:block;z-index:1;
 }
 /* 画面主体：三段全关键帧 scrub 视频（biolum-video.js）
-   seg1 0–33%（k1→k2 穿云俯冲）、seg2 33–66%（k2→k3 沉降街面）、
-   seg3 66–100%（k3→k4 入地）。33%/66% 接缝相邻段共享构图关键帧、
+   seg1 0–33%（k1→k2 黄昏入夜·第一道荧光浪）、seg2 33–66%（k2→k3 夜海苏醒·满海发光）、
+   seg3 66–100%（k3→k4 破水入水·水下星河）。33%/66% 接缝相邻段共享构图关键帧、
    短暂交叠交叉淡化（权重互补和恒 1）；scrub 恒 muted，漫游时 unmuted 三段连播。
    任一段失败 → 海报静态兜底（按覆盖段切 k1/k2/k4）。 */
 #stage video{
@@ -65,7 +65,7 @@ html{scrollbar-color:#2a1a52 #070512;scrollbar-width:thin}
 }
 /* 静态模式章节切换过场 */
 #fade{
-  position:absolute;inset:0;z-index:5;background:#04030c;opacity:0;
+  position:absolute;inset:0;z-index:5;background:#03121f;opacity:0;
   transition:opacity .34s ease;pointer-events:none;
 }
 #fade.on{opacity:1}
@@ -75,7 +75,7 @@ html{scrollbar-color:#2a1a52 #070512;scrollbar-width:thin}
   font-family:var(--mono,monospace);font-size:10px;letter-spacing:.3em;
   color:var(--dim);opacity:.9;transition:opacity .8s ease;pointer-events:none;
 }
-#loading::before{content:'LOADING ' attr(data-pct);content:'信号同步中 · ' attr(data-pct);}
+#loading::before{content:'SYNCING ' attr(data-pct);content:'荧光同步中 · ' attr(data-pct);}
 #loading.done{opacity:0;}
 
 /* ===== UI ===== */
@@ -86,13 +86,13 @@ body.ui-hidden .ui{opacity:0!important;pointer-events:none!important}
   top:0;left:0;right:0;
   display:flex;align-items:center;justify-content:space-between;gap:12px;
   padding:16px clamp(16px,3vw,36px);
-  background:linear-gradient(rgba(4,3,14,.72),rgba(4,3,14,0));
+  background:linear-gradient(rgba(3,18,31,.72),rgba(3,18,31,0));
   flex-wrap:wrap;
 }
 .brand{display:flex;flex-direction:column;line-height:1.15;user-select:none}
 .brand b{
   font-size:15px;font-weight:800;letter-spacing:.42em;color:#fff;
-  text-shadow:0 0 8px rgba(38,230,255,.8),0 0 22px rgba(255,45,149,.55);
+  text-shadow:0 0 8px rgba(61,240,200,.8),0 0 22px rgba(30,111,217,.55);
 }
 .brand span{font-size:11px;letter-spacing:.55em;color:var(--dim);margin-top:3px}
 #topbar nav{display:flex;align-items:center;gap:2px;flex-wrap:wrap}
@@ -108,15 +108,15 @@ body.ui-hidden .ui{opacity:0!important;pointer-events:none!important}
   transition:transform .3s;box-shadow:0 0 8px var(--cyn);
 }
 .nav-btn:hover{color:#fff}
-.nav-btn.active{color:#fff;text-shadow:0 0 10px rgba(38,230,255,.9)}
+.nav-btn.active{color:#fff;text-shadow:0 0 10px rgba(61,240,200,.9)}
 .nav-btn.active::after{transform:scaleX(1)}
 #tour-btn{
-  margin-left:14px;background:rgba(12,8,30,.55);border:1px solid rgba(139,92,246,.55);
+  margin-left:14px;background:rgba(6,20,34,.55);border:1px solid rgba(43,95,143,.55);
   color:var(--ink);border-radius:999px;padding:8px 16px;font:inherit;font-size:12px;
   letter-spacing:.2em;cursor:pointer;transition:border-color .25s,box-shadow .25s;
   backdrop-filter:blur(4px);
 }
-#tour-btn:hover{border-color:var(--cyn);box-shadow:0 0 14px rgba(38,230,255,.35)}
+#tour-btn:hover{border-color:var(--cyn);box-shadow:0 0 14px rgba(61,240,200,.35)}
 #tour-btn.disabled{opacity:.45;cursor:not-allowed}
 
 /* 左侧大标题（网格堆叠 + JS 淡入淡出；RM 静态模式用 .active 淡切） */
@@ -135,20 +135,20 @@ body.reduced .ch-title{transition:opacity .3s ease}
 body.reduced .ch-title.active{opacity:1;transform:none}
 .ch-num{
   font-size:12px;letter-spacing:.5em;color:var(--cyn);
-  text-shadow:0 0 10px rgba(38,230,255,.7);
+  text-shadow:0 0 10px rgba(61,240,200,.7);
 }
 .ch-line{
-  margin:0;font-size:clamp(26px,3.6vw,54px);font-weight:800;line-height:1.28;color:#f4f1ff;
-  text-shadow:0 0 14px rgba(255,45,149,.45),0 2px 30px rgba(10,4,30,.9);
+  margin:0;font-size:clamp(26px,3.6vw,54px);font-weight:800;line-height:1.28;color:#eef9f5;
+  text-shadow:0 0 14px rgba(30,111,217,.45),0 2px 30px rgba(2,18,30,.9);
 }
 .ch-sub{font-size:11px;letter-spacing:.4em;color:var(--dim)}
-/* 首屏 hero：品牌版式 + 双 CTA（仅第一章，0% 即完整可见，滚动后随节奏淡出） */
+/* 首屏 hero：品牌版式（仅第一章，0% 即完整可见，滚动后随节奏淡出） */
 .hero .ch-line{line-height:1.2;font-size:clamp(30px,4.8vw,60px)}
 .hero .ch-sub{letter-spacing:.1em;line-height:1.9;max-width:44ch;font-size:12px}
   .hero-meta{
     margin:22px 0 0;font-family:var(--mono,monospace);font-size:10px;letter-spacing:.22em;
     color:var(--dim,var(--mut,#9aa3b8));padding-top:14px;
-    border-top:1px solid rgba(255,90,180,.16);max-width:44ch;
+    border-top:1px solid rgba(30,111,217,.22);max-width:44ch;
   }
 
 /* 右侧探索进度条 0–100% */
@@ -157,14 +157,14 @@ body.reduced .ch-title.active{opacity:1;transform:none}
   display:flex;flex-direction:column;align-items:center;gap:8px;
 }
 #rail .cap{font-size:10px;letter-spacing:.18em;color:var(--dim);font-variant-numeric:tabular-nums}
-#rail .cap#pct{color:#fff;text-shadow:0 0 8px rgba(38,230,255,.8)}
-#rail .track{position:relative;width:2px;height:min(42vh,380px);background:rgba(233,230,247,.14);border-radius:2px;cursor:pointer}
+#rail .cap#pct{color:#fff;text-shadow:0 0 8px rgba(61,240,200,.8)}
+#rail .track{position:relative;width:2px;height:min(42vh,380px);background:rgba(232,245,241,.14);border-radius:2px;cursor:pointer}
 #rail-fill{
   position:absolute;top:0;left:-1px;width:4px;height:0%;border-radius:2px;
   background:linear-gradient(180deg,var(--cyn),var(--mag));
-  box-shadow:0 0 10px rgba(38,230,255,.8);
+  box-shadow:0 0 10px rgba(61,240,200,.8);
 }
-.tick{position:absolute;left:-3px;width:8px;height:1px;background:rgba(233,230,247,.35)}
+.tick{position:absolute;left:-3px;width:8px;height:1px;background:rgba(232,245,241,.35)}
 
 /* 底部滚动提示（首次滚动后淡出） */
 #hint{
@@ -175,7 +175,7 @@ body.reduced .ch-title.active{opacity:1;transform:none}
 #hint .chev{
   width:10px;height:10px;border-right:2px solid var(--cyn);border-bottom:2px solid var(--cyn);
   transform:rotate(45deg);animation:bob 1.6s ease-in-out infinite;
-  filter:drop-shadow(0 0 6px rgba(38,230,255,.8));
+  filter:drop-shadow(0 0 6px rgba(61,240,200,.8));
 }
 @keyframes bob{
   0%,100%{transform:rotate(45deg) translate(0,0);opacity:.5}
@@ -184,9 +184,9 @@ body.reduced .ch-title.active{opacity:1;transform:none}
 #hint.hide{opacity:0;pointer-events:none}
 
 /* 快捷键提示 */
-#keys{left:clamp(16px,3vw,36px);bottom:16px;font-size:10px;letter-spacing:.22em;color:rgba(233,230,247,.42)}
+#keys{left:clamp(16px,3vw,36px);bottom:16px;font-size:10px;letter-spacing:.22em;color:rgba(232,245,241,.42)}
 kbd{
-  border:1px solid rgba(233,230,247,.25);border-radius:4px;padding:1px 5px;
+  border:1px solid rgba(232,245,241,.25);border-radius:4px;padding:1px 5px;
   font-family:inherit;font-size:10px;margin:0 2px;
 }
 
@@ -194,11 +194,11 @@ kbd{
 #hud{
   left:clamp(16px,3vw,36px);bottom:52px;
   min-width:212px;padding:10px 14px 11px;
-  background:linear-gradient(160deg,rgba(10,6,26,.74),rgba(6,4,18,.55));
-  border:1px solid rgba(38,230,255,.22);border-left:2px solid var(--cyn);
+  background:linear-gradient(160deg,rgba(4,16,28,.74),rgba(3,12,22,.55));
+  border:1px solid rgba(61,240,200,.22);border-left:2px solid var(--cyn);
   border-radius:8px;backdrop-filter:blur(6px);
   font-variant-numeric:tabular-nums;
-  box-shadow:0 4px 26px rgba(2,1,10,.5),inset 0 0 18px rgba(38,230,255,.05);
+  box-shadow:0 4px 26px rgba(1,8,15,.5),inset 0 0 18px rgba(61,240,200,.05);
 }
 .hud-ch{display:none}
 .hud-ch.active{display:block}
@@ -206,30 +206,28 @@ kbd{
 @keyframes hudIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 .hud-ch.roll-out{animation:hudOut .24s ease-in forwards}   /* 穿越时刻：旧计量翻滚退场 */
 @keyframes hudOut{to{opacity:0;transform:translateY(16px);filter:blur(3px)}}
-.hud-label{font-size:10px;letter-spacing:.32em;color:rgba(38,230,255,.8);margin-bottom:5px}
+.hud-label{font-size:10px;letter-spacing:.32em;color:rgba(61,240,200,.8);margin-bottom:5px}
 .hud-big{
   font-family:"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
   font-size:clamp(28px,5vw,56px);line-height:1.04;font-weight:700;color:#fff;
-  text-shadow:0 0 12px rgba(38,230,255,.65),0 0 30px rgba(255,45,149,.3);
+  text-shadow:0 0 12px rgba(61,240,200,.65),0 0 30px rgba(30,111,217,.3);
   transition:filter .15s,text-shadow .15s;
 }
 .hud-big .hud-unit{font-size:.38em;font-weight:600;color:var(--dim);margin-left:.18em;letter-spacing:.08em}
 .hud-sub{margin-top:7px;font-size:11px;letter-spacing:.14em;color:var(--dim);display:flex;align-items:center;gap:6px}
 .hud-sub b{color:#fff;font-family:"Cascadia Mono",Consolas,monospace;font-weight:700;font-size:13px}
 .hud-sub .vs{color:var(--cyn)}
-.hud-loc{
-  font-size:clamp(17px,2vw,22px);font-weight:700;color:#fff;letter-spacing:.06em;
-  text-shadow:0 0 10px rgba(255,45,149,.5);
+/* 深度计：破水前灰待命（66–71.7%），p≥71.7% 点亮走数 */
+#hud-depth-big{transition:color .6s ease,text-shadow .6s ease;color:rgba(232,245,241,.38);text-shadow:none}
+#hud-depth-big.on{color:#fff;text-shadow:0 0 12px rgba(61,240,200,.65),0 0 30px rgba(30,111,217,.3)}
+/* 满潮徽章（CH2 角标：潮汐时钟定格时刻的纪念） */
+.hud-badge{
+  margin-top:7px;padding-top:6px;font-size:10px;letter-spacing:.18em;color:var(--dim);
+  border-top:1px dashed rgba(61,240,200,.2);
 }
-.hud-loc b{
-  color:var(--cyn);font-family:"Cascadia Mono",Consolas,monospace;font-size:1.18em;
-  text-shadow:0 0 10px rgba(38,230,255,.85);transition:filter .15s;
-}
-/* 速度响应：快滚时数字加速感（轻模糊 + 辉光增强） */
-#hud.spd .hud-big,#hud.spd .hud-loc b{filter:blur(.5px);text-shadow:0 0 18px rgba(38,230,255,.95)}
 .hud-row{display:flex;align-items:center;gap:10px;margin-top:8px}
 
-/* 楼层翻牌 B1→B2（机械整牌翻转，铰线 + 回弹） */
+/* 爆发等级翻牌 Ⅰ→Ⅴ（机械整牌翻转，铰线 + 回弹；T2 破水时定格奖牌） */
 .flip{position:relative;display:inline-block;width:56px;height:38px;perspective:220px;flex:none}
 .flip-inner{
   position:relative;display:block;width:100%;height:100%;
@@ -238,47 +236,53 @@ kbd{
 .flip.b2 .flip-inner{transform:rotateX(-180deg)}
 .flip-face{
   position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
-  display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(180deg,#141232,#0a0a1e);
-  border:1px solid rgba(38,230,255,.45);border-radius:5px;
-  font-weight:800;font-size:16px;letter-spacing:.04em;color:#fff;
-  font-family:"Cascadia Mono",Consolas,monospace;text-shadow:0 0 8px rgba(38,230,255,.8);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  background:linear-gradient(180deg,#0a2233,#061521);
+  border:1px solid rgba(61,240,200,.45);border-radius:5px;
+  color:#fff;font-family:"Cascadia Mono",Consolas,monospace;
 }
-.flip-face.back{transform:rotateX(180deg);border-color:rgba(255,180,84,.55);color:#ffd9a0;text-shadow:0 0 8px rgba(255,180,84,.8)}
-.flip::after{content:"";position:absolute;left:3px;right:3px;top:50%;height:1px;background:rgba(2,1,10,.8);z-index:2}
+.flip-face i{
+  font-style:normal;font-weight:800;font-size:17px;line-height:1;letter-spacing:.04em;
+  text-shadow:0 0 8px rgba(61,240,200,.8);
+}
+.flip-face em{font-style:normal;font-weight:600;font-size:6.5px;letter-spacing:.1em;line-height:1}
+.flip-face.back{transform:rotateX(180deg);border-color:rgba(255,158,109,.55);color:#ffd9ae}
+.flip-face.back i{text-shadow:0 0 8px rgba(255,158,109,.8)}
+.flip::after{content:"";position:absolute;left:3px;right:3px;top:50%;height:1px;background:rgba(1,8,15,.8);z-index:2}
 .hud-temp{font-size:12px;letter-spacing:.1em;color:var(--dim)}
 
-/* 抵达：城市的心跳（SEG3 尾端亮起） */
+/* 抵达：今晚的海为你亮过（SEG3 尾端亮起） */
 #hud-arrive{
   margin-top:9px;font-size:13px;font-weight:700;letter-spacing:.22em;
-  color:rgba(255,180,84,.25);opacity:0;transition:opacity .8s;
+  color:rgba(255,158,109,.25);opacity:0;transition:opacity .8s;
 }
 #hud-arrive.lit{
-  opacity:1;color:#ffd9a0;
-  text-shadow:0 0 12px rgba(255,180,84,.9),0 0 34px rgba(255,120,60,.5);
+  opacity:1;color:#ffd9ae;
+  text-shadow:0 0 12px rgba(255,158,109,.9),0 0 34px rgba(255,120,60,.5);
   animation:arriveGlow 2.4s ease-in-out infinite;
 }
 @keyframes arriveGlow{
-  0%,100%{text-shadow:0 0 10px rgba(255,180,84,.7),0 0 26px rgba(255,120,60,.35)}
-  50%{text-shadow:0 0 16px rgba(255,190,100,1),0 0 44px rgba(255,120,60,.7)}
+  0%,100%{text-shadow:0 0 10px rgba(255,158,109,.7),0 0 26px rgba(255,120,60,.35)}
+  50%{text-shadow:0 0 16px rgba(255,174,120,1),0 0 44px rgba(255,120,60,.7)}
 }
 
-/* 伞图标：穿越 C 落地收伞（下落触地 → 伞面收拢 → 手持摆动） */
-.umb{display:inline-flex;line-height:0;transform-origin:50% 90%;transition:transform .7s cubic-bezier(.55,-.15,.3,1.2)}
-.umb svg{overflow:visible}
-.umb.land svg{animation:umbBob .5s ease-out}
-@keyframes umbBob{0%{transform:translateY(-7px)}62%{transform:translateY(1px)}100%{transform:none}}
-.umb-canopy{
-  fill:var(--cyn);opacity:.92;
+/* 望远镜图标：穿越 T1「夜幕初光」收起（触地 → 镜身收拢挂侧 → 轻摆归稳） */
+.bino{display:inline-flex;line-height:0;transform-origin:50% 90%;transition:transform .7s cubic-bezier(.55,-.15,.3,1.2)}
+.bino svg{overflow:visible}
+.bino.land svg{animation:binoBob .5s ease-out}
+@keyframes binoBob{0%{transform:translateY(-7px)}62%{transform:translateY(1px)}100%{transform:none}}
+.bino-tube{
+  fill:none;stroke:var(--cyn);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;
+}
+.bino-lens{
+  fill:none;stroke:var(--cyn);stroke-width:1.5;opacity:.92;
   transform-box:fill-box;transform-origin:50% 100%;
   transition:transform .7s cubic-bezier(.55,-.15,.3,1.2);
 }
-.umb-rib{fill:none;stroke:rgba(4,3,14,.45);stroke-width:1}
-.umb-shaft{fill:none;stroke:var(--ink);stroke-width:1.6;stroke-linecap:round}
-.umb.folded{transform:rotate(18deg)}
-.umb.folded .umb-canopy{transform:scaleY(.14) scaleX(.9)}
-.umb.folded svg{animation:umbSway 2.6s ease-in-out infinite alternate}
-@keyframes umbSway{from{transform:rotate(-3deg)}to{transform:rotate(3deg)}}
+.bino.folded{transform:rotate(18deg)}
+.bino.folded .bino-lens{transform:scaleY(.5) scaleX(.85)}
+.bino.folded svg{animation:binoSway 2.6s ease-in-out infinite alternate}
+@keyframes binoSway{from{transform:rotate(-3deg)}to{transform:rotate(3deg)}}
 
 /* ===== P1：待机呼吸提示（停留 3s，按章换文案） ===== */
 #idle-hint{
@@ -292,11 +296,15 @@ kbd{
 /* ===== P1：穿越时刻视觉 ===== */
 #flash{display:none;position:fixed;inset:0;z-index:15;pointer-events:none;opacity:0;mix-blend-mode:screen}
 #flash.cool{
-  background:radial-gradient(120% 100% at 50% 62%,rgba(120,240,255,.5),rgba(255,45,149,.28) 60%,transparent);
+  background:radial-gradient(120% 100% at 50% 62%,rgba(125,251,224,.5),rgba(30,111,217,.28) 60%,transparent);
+  animation:flashFade .45s ease-out;
+}
+#flash.deep{
+  background:radial-gradient(120% 100% at 50% 62%,rgba(61,240,200,.3),rgba(20,90,110,.26) 60%,transparent);
   animation:flashFade .45s ease-out;
 }
 #flash.warm{
-  background:radial-gradient(120% 100% at 50% 62%,rgba(255,190,90,.55),rgba(255,120,60,.3) 60%,transparent);
+  background:radial-gradient(120% 100% at 50% 62%,rgba(255,158,109,.55),rgba(255,120,60,.3) 60%,transparent);
   animation:flashFade .45s ease-out;
 }
 @keyframes flashFade{0%{opacity:0}18%{opacity:1}100%{opacity:0}}
@@ -314,15 +322,15 @@ kbd{
 
 /* ===== P1：静音钮（M 键共享状态） ===== */
 #mute-btn{
-  margin-left:10px;background:rgba(12,8,30,.55);border:1px solid rgba(38,230,255,.35);
+  margin-left:10px;background:rgba(6,20,34,.55);border:1px solid rgba(61,240,200,.35);
   color:var(--ink);border-radius:999px;padding:8px 13px;font:inherit;font-size:12px;
   letter-spacing:.14em;cursor:pointer;backdrop-filter:blur(4px);
   transition:border-color .25s,color .25s;
 }
 #mute-btn::before{content:"♪ ";color:var(--cyn)}
-#mute-btn:hover{border-color:var(--cyn);box-shadow:0 0 12px rgba(38,230,255,.3)}
-#mute-btn.muted{color:var(--dim);border-color:rgba(233,230,247,.2)}
-#mute-btn.muted::before{color:rgba(233,230,247,.35);text-decoration:line-through}
+#mute-btn:hover{border-color:var(--cyn);box-shadow:0 0 12px rgba(61,240,200,.3)}
+#mute-btn.muted{color:var(--dim);border-color:rgba(232,245,241,.2)}
+#mute-btn.muted::before{color:rgba(232,245,241,.35);text-decoration:line-through}
 
 /* ===== 窄屏自适应（≤720px：标题上移避开 HUD/提示，hero 压缩不碰撞） ===== */
 @media (max-width:720px){
@@ -338,7 +346,7 @@ kbd{
   .hero-meta{
     margin:22px 0 0;font-family:var(--mono,monospace);font-size:10px;letter-spacing:.22em;
     color:var(--dim,var(--mut,#9aa3b8));padding-top:14px;
-    border-top:1px solid rgba(255,90,180,.16);max-width:44ch;
+    border-top:1px solid rgba(30,111,217,.22);max-width:44ch;
   }
   #rail .track{height:24vh}
   #keys{display:none}
@@ -354,15 +362,20 @@ kbd{
     min-width:0;padding:7px 10px 8px;border-radius:6px;
   }
   .hud-big{font-size:24px}
-  .hud-loc{font-size:15px}
   .hud-sub{font-size:10px;margin-top:4px}
   .hud-sub b{font-size:12px}
+  .hud-badge{font-size:9px;margin-top:5px;padding-top:4px}
   .hud-row{margin-top:5px;gap:8px}
   .flip{width:44px;height:30px}
-  .flip-face{font-size:13px}
+  .flip-face i{font-size:14px}
+  .flip-face em{font-size:5.5px}
   #hud-arrive{font-size:11px;letter-spacing:.14em;margin-top:6px}
   #idle-hint{font-size:10px;letter-spacing:.22em}
 }
+
+/* 速度响应：快滚时数字加速感（轻模糊 + 辉光增强） */
+#hud.spd .hud-big{filter:blur(.5px);text-shadow:0 0 18px rgba(61,240,200,.95)}
+#hud.spd .hud-big#hud-depth-big:not(.on){color:rgba(232,245,241,.38);text-shadow:none}
 
 /* ===== prefers-reduced-motion：静态模式（P1：无微震无动画，HUD 淡切） ===== */
 @media (prefers-reduced-motion: reduce){
@@ -373,12 +386,13 @@ kbd{
   .hud-ch.in{animation:none;transition:opacity .25s}
   .hud-ch.roll-out{animation:none}
   .flip-inner{transition:none}
-  .umb,.umb-canopy{transition:none}
-  .umb svg,.umb.folded svg,.umb.land svg{animation:none}
+  .bino,.bino-lens{transition:none}
+  .bino svg,.bino.folded svg,.bino.land svg{animation:none}
+  #hud-depth-big{transition:none}
   #stage.shake,#stage.bio-pulse,#stage.shake.bio-pulse{animation:none}
   #flash{display:none}
   #idle-hint.on{animation:none;opacity:.75}
-  #hud.spd .hud-big,#hud.spd .hud-loc b{filter:none}
+  #hud.spd .hud-big,#hud.spd .hud-big#hud-depth-big{filter:none}
   #hud-arrive.lit{animation:none}
 }
 </style>
@@ -389,8 +403,8 @@ kbd{
 
 <!-- 固定铺满视口的画面层（v3 视频优先：视频 = 画面唯一来源；
      海报 = 首屏第一印象 / 失败兜底 / 静态模式关键帧；无 canvas、无程序渲染） -->
-<div id="stage" role="img" aria-label="BIOLUM 蓝眼泪：滚动驱动的叙事网站">
-  <img id="poster" src="assets/keys2/k1.png" alt="" aria-hidden="true">
+<div id="stage" role="img" aria-label="蓝眼泪追光一夜：从黄昏的海边小镇，到夜幕下苏醒的荧光海，再潜入水下的星河">
+  <img id="poster" src="assets/keys/k1.png" alt="" aria-hidden="true">
   <video id="vid1" muted playsinline preload="none" aria-hidden="true"></video>
   <video id="vid2" muted playsinline preload="none" aria-hidden="true"></video>
   <video id="vid3" muted playsinline preload="none" aria-hidden="true"></video>
@@ -400,11 +414,11 @@ kbd{
 </div>
 
 <header id="topbar" class="ui">
-  <div class="brand"><b>BIOLUM</b><span>蓝眼泪</span></div>
+  <div class="brand"><b>BIOLUMINESCE</b><span>蓝眼泪</span></div>
   <nav aria-label="章节导航">
-    <button class="nav-btn active" type="button">高空</button>
-    <button class="nav-btn" type="button">街面</button>
-    <button class="nav-btn" type="button">地下</button>
+    <button class="nav-btn active" type="button">黄昏</button>
+    <button class="nav-btn" type="button">夜海</button>
+    <button class="nav-btn" type="button">水下</button>
     <button id="tour-btn" type="button">▶ 自动漫游</button>
     <button id="mute-btn" type="button" aria-pressed="false" title="声音开关（M）"><span id="mute-txt">音效</span></button>
   </nav>
@@ -413,20 +427,20 @@ kbd{
 <div id="titles" class="ui" aria-live="polite">
   <!-- 首屏 hero：kicker + 大标题 + 副标 + 元信息，0% 即完整可见，滚动后随节奏淡出 -->
   <div class="ch-title hero" id="title-0">
-    <span class="ch-num">BIOLUM · 蓝眼泪</span>
-    <h2 class="ch-line">这场雨，从四百米高空<br>落进城市心底。</h2>
-    <span class="ch-sub">滚动即下落——穿过云层、坠入楼隙、沉进地下的暖光。一次滚动，一段坠落；停下，雨也为你停。</span>
-    <p class="hero-meta">三章 · 海拔 480 M · 自动漫游见右下 · 建议开启声音</p>
+    <span class="ch-num">蓝眼泪 · BIOLUMINESCE · 追光一夜</span>
+    <h2 class="ch-line">听说，<br>海今晚会发光。</h2>
+    <span class="ch-sub">滚动即追光——从黄昏最后一缕橙，一路潜进整片海的星河。一次滚动，一夜潮汐；停下，浪也为你停。</span>
+    <p class="hero-meta">三章 · 满潮 21:17 · 自动漫游见右下 · 建议开启声音</p>
   </div>
   <div class="ch-title" id="title-1">
-    <span class="ch-num">CH.02 · 街面</span>
-    <h2 class="ch-line">「霓虹之下，人流如数据。」</h2>
-    <span class="ch-sub">BIOLUMINESCENT BAY</span>
+    <span class="ch-num">CH.02 · 夜海</span>
+    <h2 class="ch-line">「海醒了，一浪亮过一浪。」</h2>
+    <span class="ch-sub">NIGHT SEA — THE BAY AWAKENS</span>
   </div>
   <div class="ch-title" id="title-2">
-    <span class="ch-num">CH.03 · 地下</span>
-    <h2 class="ch-line">「再往下，是城市的心跳。」</h2>
-    <span class="ch-sub">UNDERGROUND — CITY HEARTBEAT</span>
+    <span class="ch-num">CH.03 · 水下</span>
+    <h2 class="ch-line">「屏住呼吸，潜进一片星河。」</h2>
+    <span class="ch-sub">UNDERWATER — A SEA OF STARS</span>
   </div>
 </div>
 
@@ -440,37 +454,43 @@ kbd{
   <span class="cap">100%</span>
 </div>
 
-<!-- ===== P1 反馈层：计量 HUD（海拔计 / 街道定位+伞+门牌+步数 / 楼层翻牌+温度+距离倒数+抵达） ===== -->
+<!-- ===== P1 反馈层：计量 HUD（潮汐时钟+追光步速 / 发光指数+爆发等级+望远镜 / 深度计+等级翻牌+双态温度+抵达） ===== -->
 <div id="hud" class="ui" aria-live="off">
   <div class="hud-ch active in" id="hud-seg1">
-    <div class="hud-label">ALT · 海拔</div>
-    <div class="hud-big"><span id="hud-alt">480.0</span><span class="hud-unit">m</span></div>
-    <div class="hud-sub">垂直速度 <b id="hud-vs">0.0</b> m/s <span class="vs">↓</span></div>
+    <div class="hud-label">TIDE · 潮汐时刻</div>
+    <div class="hud-big"><span id="hud-tide">19:42</span></div>
+    <div class="hud-sub">追光步速 <b id="hud-vs">0</b> 步/分 <span class="vs">↓</span></div>
   </div>
   <div class="hud-ch" id="hud-seg2">
-    <div class="hud-label">LOC · 街道定位</div>
-    <div class="hud-loc">中山路 · 路口<b id="hud-door">07</b></div>
+    <div class="hud-label">GLOW · 发光指数</div>
+    <div class="hud-big"><span id="hud-glow">0</span><span class="hud-unit">%</span></div>
     <div class="hud-sub">
-      <span class="umb" id="umb" aria-hidden="true">
+      <span class="bino" id="bino" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="20" height="20">
-          <g class="umb-canopy">
-            <path d="M12 2.5C6.7 2.5 2.5 6.6 2.5 11h19c0-4.4-4.2-8.5-9.5-8.5z"/>
-            <path class="umb-rib" d="M12 2.5V11M7 3.4L6 11M17 3.4L18 11"/>
+          <g class="bino-tube">
+            <rect x="4.8" y="3.6" width="5.2" height="8.6" rx="2"/>
+            <rect x="14" y="3.6" width="5.2" height="8.6" rx="2"/>
+            <path d="M10 8.2h4"/>
+            <circle cx="12" cy="11.6" r="1.5"/>
           </g>
-          <path class="umb-shaft" d="M12 11v8a1.9 1.9 0 0 0 3.8 0"/>
+          <g class="bino-lens">
+            <circle cx="7.4" cy="16.4" r="3.5"/>
+            <circle cx="16.6" cy="16.4" r="3.5"/>
+          </g>
         </svg>
       </span>
-      步数 <b id="hud-steps">0</b>
+      爆发等级 <b id="hud-burst">Ⅰ SPARK</b>
     </div>
+    <div class="hud-badge">满潮 21:17 ✓</div>
   </div>
   <div class="hud-ch" id="hud-seg3">
-    <div class="hud-label">DIST · 距核心面档</div>
-    <div class="hud-big"><span id="hud-dist">12.0</span><span class="hud-unit">m</span></div>
+    <div class="hud-label">DEPTH · 水下深度</div>
+    <div class="hud-big" id="hud-depth-big"><span id="hud-depth">0.0</span><span class="hud-unit">m</span></div>
     <div class="hud-row">
-      <span class="flip" id="hud-floor" aria-label="楼层 B1"><span class="flip-inner"><span class="flip-face front">B1</span><span class="flip-face back">B2</span></span></span>
-      <span class="hud-temp" id="hud-temp">地表 12°</span>
+      <span class="flip" id="hud-floor" aria-label="夜光藻爆发等级 Ⅰ → Ⅴ"><span class="flip-inner"><span class="flip-face front"><i>Ⅰ</i><em>SPARK</em></span><span class="flip-face back"><i>Ⅴ</i><em>SEA OF LIGHT</em></span></span></span>
+      <span class="hud-temp" id="hud-temp">气温 22°</span>
     </div>
-    <div id="hud-arrive">已抵达 · 城市的心跳</div>
+    <div id="hud-arrive">已抵达 · 今晚的海为你亮过</div>
   </div>
 </div>
 
@@ -478,10 +498,10 @@ kbd{
 <div id="flash" aria-hidden="true"></div>
 
 <!-- P1：待机呼吸提示（停留 3s，文案按章变化） -->
-<div id="idle-hint" class="ui" aria-hidden="true">继续下落 ↓</div>
+<div id="idle-hint" class="ui" aria-hidden="true">一晚能看到满海发光的人，不到一船 ↓</div>
 
 <div id="hint" class="ui">
-  <span>向下滚动 · 开始雨夜漫游</span>
+  <span>向下滚动 · 开始追光一夜</span>
   <span class="chev"></span>
 </div>
 
@@ -490,9 +510,9 @@ kbd{
 </div>
 
 <noscript>
-  <style>#stage{background:#04030c url(assets/keys2/k1.png) center/cover no-repeat}</style>
-  <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#04030c;color:#e9e6f7;z-index:99;text-align:center;padding:24px">
-    本页面需要启用 JavaScript 才能呈现雨夜漫游场景。
+  <style>#stage{background:#03121f url(assets/keys/k1.png) center/cover no-repeat}</style>
+  <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#03121f;color:#e8f5f1;z-index:99;text-align:center;padding:24px">
+    本页面需要启用 JavaScript 才能呈现蓝眼泪的荧光海场景。
   </div>
 </noscript>
 
