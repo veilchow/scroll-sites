@@ -215,7 +215,7 @@
   #hud-sync.lit{color:#ffe9c9;text-shadow:0 0 26px rgba(255,196,110,.8)}
   #hud-sync.pulse{animation:sync-pulse .6s ease}
   @keyframes sync-pulse{0%{transform:scale(1)}35%{transform:scale(1.07)}100%{transform:scale(1)}}
-  .hud-cluster.boot{animation:hud-boot .9s steps(1) both}
+  .hud-cluster.boot{animation:hud-boot .9s steps(1)}  /* 无 fill：动画结束后回到类驱动透明度（both 会永久钉死 opacity:1，导致回顶后同步率卡片残留遮挡）*/
   @keyframes hud-boot{0%{opacity:0}12%{opacity:.7}20%{opacity:.15}32%{opacity:.85}45%{opacity:.3}60%,100%{opacity:1}}
 
   /* 目标锁定框（屏幕中心，随距离接近收缩） */
