@@ -225,8 +225,9 @@
     else P = Promise.reject(new Error('fetch unavailable'));
     P.then(function (r) {
       if (!r || !r.ok) throw new Error('http ' + (r && r.status));
-      /* 加载状态（原帖明文要求）：流式读取字节数 → 百分比指示 */
-      var len = +(r.headers.get('content-length') || 0);
+      /* 加载状态（原帖明文要求）：流式读取字节数 → 百分比指示
+       *（headers 防御：桩环境/极简 Response 可能无 headers，缺失则跳过百分比走 blob()） */
+      var len = r.headers ? +(r.headers.get('content-length') || 0) : 0;
       var lb = document.getElementById('loading');
       if (lb && len > 0 && r.body && r.body.getReader) {
         var reader = r.body.getReader(), got = 0, chunks = [];

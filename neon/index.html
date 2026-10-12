@@ -69,6 +69,14 @@ html{scrollbar-color:#2a1a52 #070512;scrollbar-width:thin}
   transition:opacity .34s ease;pointer-events:none;
 }
 #fade.on{opacity:1}
+/* 加载指示：流式装载百分比（neon-video.js 写 data-pct），首段显影后 .done 淡出 */
+#loading{
+  position:absolute;left:50%;bottom:18vh;transform:translateX(-50%);z-index:8;
+  font-family:var(--mono,monospace);font-size:10px;letter-spacing:.3em;
+  color:var(--dim);opacity:.9;transition:opacity .8s ease;pointer-events:none;
+}
+#loading::before{content:'LOADING ' attr(data-pct);content:'信号同步中 · ' attr(data-pct);}
+#loading.done{opacity:0;}
 
 /* ===== UI ===== */
 .ui{position:fixed;z-index:20;transition:opacity .4s ease}

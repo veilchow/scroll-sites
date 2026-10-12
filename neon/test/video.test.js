@@ -69,7 +69,13 @@ FakeVideoEl.prototype.removeAttribute = function () {};
 FakeVideoEl.prototype.setAttribute = function () {};
 
 function okFetch() {
-  return Promise.resolve({ ok: true, status: 200, blob: function () { return Promise.resolve({ size: 1 }); } });
+  /* headers 桩：真实 Response 必有 Headers（fetch 规范）；content-length 缺省返回 null
+   * → 源码 len=0 走 r.blob()，与流式百分比路径（#loading 元素存在时才启用）解耦 */
+  return Promise.resolve({
+    ok: true, status: 200,
+    headers: { get: function (n) { return n === 'content-length' ? '1' : null; } },
+    blob: function () { return Promise.resolve({ size: 1 }); }
+  });
 }
 function deadFetch() {
   return Promise.reject(new Error('net down'));
@@ -77,7 +83,7 @@ function deadFetch() {
 
 function makeEnv(fetchImpl, opts) {
   var v = [new FakeVideoEl(), new FakeVideoEl(), new FakeVideoEl()];
-  var poster = { src: 'assets/keys/k1.png' };
+  var poster = { src: 'assets/keys2/k1.png' };
   var winObj = {
     setTimeout: setTimeout, clearTimeout: clearTimeout,
     fetch: fetchImpl,
@@ -118,8 +124,8 @@ check(JSON.stringify(L.SEAM1) === JSON.stringify([0.315, 0.345]), 'SEAM1 = [0.31
 check(JSON.stringify(L.SEAM2) === JSON.stringify([0.645, 0.675]), 'SEAM2 = [0.645,0.675]');
 check(L.SEAM1[1] < L.SEAM2[0], '两接缝窗口互不相交（权重代数互补的前提）');
 check(L.PRELOAD_AT[1] === 0.15 && L.PRELOAD_AT[2] === 0.45, '预载阈值 seg2@0.15 / seg3@0.45');
-check(L.SEGS_DEF[0].poster === 'assets/keys/k1.png' && L.SEGS_DEF[1].poster === 'assets/keys/k2.png' &&
-  L.SEGS_DEF[2].poster === 'assets/keys/k4.png', '失败兜底海报 seg1→k1 / seg2→k2 / seg3→k4');
+check(L.SEGS_DEF[0].poster === 'assets/keys2/k1.png' && L.SEGS_DEF[1].poster === 'assets/keys2/k2.png' &&
+  L.SEGS_DEF[2].poster === 'assets/keys2/k4.png', '失败兜底海报 seg1→k1 / seg2→k2 / seg3→k4');
 check(L.SEGS_DEF[0].urls[0] === 'assets/seg1-scrub.mp4' && L.SEGS_DEF[0].urls[1] === 'assets/seg1.mp4' &&
   L.SEGS_DEF[2].urls[0] === 'assets/seg3-scrub.mp4' && L.SEGS_DEF[2].urls[1] === 'assets/seg3.mp4',
   '段定义 = seg*-scrub.mp4（备用 seg*.mp4）');
@@ -219,7 +225,7 @@ function runFallbackTests() {
     check(s.segs[0].status === 'failed', 'fetch 全失败后 seg1 应 failed');
     check(s.segs[1].status === 'idle' && s.segs[2].status === 'idle', '未到预载阈值的段应保持 idle');
     envFail.api.update({ p: 0.1 });
-    check(envFail.poster.src === 'assets/keys/k1.png', 'seg1 失败（覆盖段）海报应为 k1');
+    check(envFail.poster.src === 'assets/keys2/k1.png', 'seg1 失败（覆盖段）海报应为 k1');
     check(envFail.api.coverage().a1 === 0, '失败段覆盖率归零（海报静态兜底，无程序渲染）');
 
     /* 超时路径（8s 压缩为 40ms，fetch 永不 resolve） */
@@ -239,12 +245,12 @@ function runFallbackTests() {
           check(envMix.api._state().segs[0].status === 'ready', 'seg1 应 ready');
           check(envMix.api._state().segs[1].status === 'failed', 'seg2 双 URL 失败后应 failed');
           envMix.api.update({ p: 0.16 });
-          check(envMix.poster.src === 'assets/keys/k1.png',
+          check(envMix.poster.src === 'assets/keys2/k1.png',
             'seg2 失败但 p 在 seg1 区间：不提前切海报（仍 k1）');
           envMix.api.update({ p: 0.40 });               /* 进入 seg2 覆盖区间 */
-          check(envMix.poster.src === 'assets/keys/k2.png', '进入失败覆盖段后海报应切 k2');
+          check(envMix.poster.src === 'assets/keys2/k2.png', '进入失败覆盖段后海报应切 k2');
           envMix.api.update({ p: 0.10 });               /* 回退到 seg1 区间：seg1 未失败，不回写 */
-          check(envMix.poster.src === 'assets/keys/k2.png', '回退段未失败时不重复切海报');
+          check(envMix.poster.src === 'assets/keys2/k2.png', '回退段未失败时不重复切海报');
         });
       });
     });
@@ -355,9 +361,9 @@ function runTourTests() {
             envDead.api.update({ p: 0.5 });            /* 触发 seg2/seg3 预载 → 均失败 */
             return sleep(30).then(function () {
               envDead.api.update({ p: 0.5 });
-              check(envDead.poster.src === 'assets/keys/k2.png', '漫游失败环境中海报按覆盖段切 k2');
+              check(envDead.poster.src === 'assets/keys2/k2.png', '漫游失败环境中海报按覆盖段切 k2');
               envDead.api.update({ p: 0.8 });
-              check(envDead.poster.src === 'assets/keys/k4.png', '覆盖到失败 seg3 后海报切 k4');
+              check(envDead.poster.src === 'assets/keys2/k4.png', '覆盖到失败 seg3 后海报切 k4');
               var covD = envDead.api.coverage();
               check(covD.a1 === 0 && covD.a2 === 0 && covD.a3 === 0, '全失败覆盖率归零（海报静态兜底）');
 
