@@ -198,6 +198,8 @@
           if (!seg.revealed && seg.status === 'ready') {
             seg.revealed = true;
             seg.revealT0 = nowMs();
+            var lb0 = document.getElementById('loading');
+            if (lb0) lb0.classList.add('done');
           }
         });
         seg.__idx = segs.length;
@@ -223,6 +225,24 @@
     else P = Promise.reject(new Error('fetch unavailable'));
     P.then(function (r) {
       if (!r || !r.ok) throw new Error('http ' + (r && r.status));
+      /* 加载状态（原帖明文要求）：流式读取字节数 → 百分比指示 */
+      var len = +(r.headers.get('content-length') || 0);
+      var lb = document.getElementById('loading');
+      if (lb && len > 0 && r.body && r.body.getReader) {
+        var reader = r.body.getReader(), got = 0, chunks = [];
+        var pump = function () {
+          return reader.read().then(function (res) {
+            if (res.done) return chunks;
+            got += res.value.length;
+            chunks.push(res.value);
+            lb.setAttribute('data-pct', Math.min(100, Math.round(got / len * 100)) + '%');
+            return pump();
+          });
+        };
+        return pump().then(function (cs) {
+          return new Blob(cs, { type: r.headers.get('content-type') || 'video/mp4' });
+        });
+      }
       return r.blob();
     }).then(function (b) {
       if (seg.status !== 'loading') return;
