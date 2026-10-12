@@ -117,6 +117,15 @@
      *    其余区间（或视频不可用时）以 45s 匀速推进真实滚动位置 */
     if (st.tour.on && !st.tour.paused) {
       st.tour.elapsed += dt;
+      if (Vid && Vid.evTourActive && Vid.evTourActive()) {   /* 事件驱动：显示跟随（控制权在 ended 事件链） */
+        var dvp = Vid.tourDisplayP();
+        if (dvp !== null) {
+          st.current = dvp;
+          win.scrollTo(0, Math.round(dvp * st.scrollable));
+          st.raf2 = 0;
+        }
+        /* 无需 else：切换与完成由 ended 事件回调 evEngage/endTour */
+      }
       var vp = Vid ? Vid.tourSync(st.current) : null;    /* null = 该区间无视频接管 */
       if (vp !== null) {
         st.tour.videoPaced = true;
@@ -245,6 +254,9 @@
     else { tourIco.textContent = '▶'; tourLabel.textContent = '自动漫游 · 45s'; }
   }
   function beginTour(fromT) {
+    if (Vid && Vid.tourStartEv && Vid.tourStartEv(fromT)) {
+      st.tour.videoPaced = true;              /* 事件驱动接管：ended→下一段 */
+    }
     st.tour.on = true;
     st.tour.paused = false;
     st.tour.startT = fromT;
@@ -263,6 +275,7 @@
     else beginTour(t0);
   }
   function endTour() {
+    if (Vid && Vid.tourStopEv) Vid.tourStopEv();
     st.tour.on = false;
     st.tour.paused = false;
     st.tour.videoPaced = false;
@@ -403,7 +416,58 @@
 
   tourBtn.addEventListener('click', function () { tourBtn.blur(); startTour(); });
 
-  /* 首屏 hero CTA：接管自动漫游 / 提示滚动接管 */
+  /* ================= 页面不可见时暂停 rAF ================= */
+  doc.addEventListener('visibilitychange', function () {
+    if (st.reduced) return;
+    if (doc.hidden) {
+      if (st.raf) win.cancelAnimationFrame(st.raf);
+      st.running = false;
+    } else if (!st.running) {
+      st.running = true;
+      st.lastTs = 0;
+      st.raf = win.requestAnimationFrame(frame);
+    }
+  });
+
+  /* ================= resize 防抖重建 ================= */
+  var rzTimer = 0, lastW = 0, lastH = 0;
+  win.addEventListener('resize', function () {
+    win.clearTimeout(rzTimer);
+    rzTimer = win.setTimeout(function () {
+      var w = win.innerWidth, h = win.innerHeight;
+      var big = Math.abs(w - lastW) > 2 || Math.abs(h - lastH) > 140;  /* 忽略移动端地址栏微变 */
+      if (!big && !st.reduced) return;
+      lastW = w; lastH = h;
+      measure(true);
+      if (st.reduced) setReducedChapter(st.reducedIdx);
+    }, 160);
+  }, { passive: true });
+
+  /* ================= 静态模式（prefers-reduced-motion） ================= */
+  function setReducedChapter(i, noFade) {
+    st.reducedIdx = clamp(i, 0, 2);
+    for (var k = 0; k < titles.length; k++) {
+      var el = titles[k];
+      el.style.opacity = '';
+      el.style.transform = '';
+      el._o = null; el._ty = null;
+      el.classList.toggle('active', k === st.reducedIdx);
+    }
+    for (k = 0; k < navBtns.length; k++) navBtns[k].classList.toggle('active', k === st.reducedIdx);
+    for (k = 0; k < dots.length; k++) dots[k].classList.toggle('active', k === st.reducedIdx);
+    st.current = REDUCED_KEYS[st.reducedIdx];
+    st.clock = 1.7;
+    st.speed = 0;
+    st.target = st.current;
+    if (posterEl) posterEl.src = POSTERS[st.reducedIdx];   /* 静态模式 = 关键帧海报 */
+    /* P1 反馈层：静态模式下 HUD 显示对应章读数（无动画无 sting），音床跟随章切换 */
+    if (Aud) Aud.setChapter(st.reducedIdx + 1);
+    if (Hud) Hud.update({
+      p: st.current, speed: 0, dt: 0, clock: st.clock,
+      touring: false, gliding: false, introDone: true
+    });
+    void noFade;
+  }
   function switchReduced(i) {
     i = clamp(i, 0, 2);
     if (i === st.reducedIdx) return;
@@ -429,7 +493,9 @@
     /* 画面层：两段视频 scrub 覆盖 0–100%（js/astra-video.js）；
      * seg1 0–55%（approach→port）、seg2 55–100%（port→core，结尾停稳在尾帧）。
      * 海报 = 首屏第一印象 + 失败兜底 + 静态模式关键帧。 */
-    if (Vid) Vid.init({ reduced: st.reduced });     /* reduced：模块禁用，静态模式用海报 */
+    if (Vid) Vid.init({ reduced: st.reduced,
+      onTourDone: function () { if (st.tour.on) endTour(); },
+      onTourBreak: function () { st.tour.videoPaced = false; st.tour.startT = clamp(st.current, 0, 0.999); st.tour.elapsed = 0; st.tour.dur = Math.max(6, (1 - st.tour.startT) * TOUR_FULL_SEC) * 1000; } });     /* reduced：模块禁用，静态模式用海报 */
     /* P1 反馈层初始化：HUD（reduced 标志决定穿越动效取舍）+ 声音系统状态回调。
      * AudioContext 由模块在首次用户手势时自行创建（INTERACTION-DESIGN §2.3）。 */
     if (Hud) Hud.init({ reduced: st.reduced });

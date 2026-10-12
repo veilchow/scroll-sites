@@ -183,6 +183,9 @@
     tourBtn.textContent = !tour.on ? '▶ 自动漫游' : (tour.paused ? '▶ 继续漫游' : '⏸ 暂停漫游');
   }
   function startTour() {
+    if (Vid && Vid.tourStartEv && Vid.tourStartEv(curP)) {
+      tour.videoPaced = true;   /* 事件驱动接管：ended→下一段，rAF 只显示跟随 */
+    }
     if (window.__rec) window.__rec('startTour', { p: +(curP || 0).toFixed(3) });
     if (rm) return;
     tour.on = true;
@@ -197,6 +200,7 @@
     if (SND) SND.blip(true);                 // P1：漫游启动确认音
   }
   function stopTour() {
+    if (Vid && Vid.tourStopEv) Vid.tourStopEv();
     if (window.__rec) window.__rec('stopTour', { p: +(curP || 0).toFixed(3) });
     tour.on = false;
     tour.paused = false;
@@ -221,19 +225,24 @@
       if (k >= 1) { tour.phase = 'fwd'; tour.acc = 0; tour.elapsed = 0; tour.startT = 0; tour.dur = TOUR_FULL_SEC * 1000; }
       return;
     }
-    /* fwd：视频三段 unmuted 连播接管漫游节奏（视频时长即漫游时长） */
+    /* fwd：事件驱动漫游（v3）——控制权在视频 ended 事件链，这里只做显示跟随 */
+    if (Vid && Vid.evTourActive && Vid.evTourActive()) {
+      var dvp = Vid.tourDisplayP();
+      if (dvp !== null) {
+        curP = dvp;
+        window.scrollTo(0, Math.round(dvp * maxScroll));
+        return;                               /* 完成与切换均由 ended 事件回调 stopTour/evEngage */
+      }
+    }
     var vp = Vid ? Vid.tourSync(curP) : null;
     if (vp !== null) {
       tour.videoPaced = true;
-      /* 视频时钟直通：vp 直接作为当前进度（视频是漫游的权威时钟），
-       * 不再经 scrollTo→scrollY/maxScroll 换算回读——那会在接缝处
-       * 产生 0.65999… 的浮点地狱，段界判定永远跨不过去（卡 66% 事故） */
       curP = vp;
       window.scrollTo(0, Math.round(vp * maxScroll));
       if (vp >= 0.9995) stopTour();
       return;
     }
-    if (tour.videoPaced) {                    // 视频段结束/不可用 → 从当前进度重定匀速节奏
+    if (tour.videoPaced) {                    // 视频不可用 → 从当前进度重定匀速节奏
       if (window.__rec) window.__rec('tour-fallback', { p: +curP.toFixed(4) });
       tour.videoPaced = false;
       tour.startT = clamp(curP, 0, 0.999);
@@ -454,7 +463,9 @@
   window.scrollTo(0, 0);
   measure();
   if (rm) document.body.classList.add('reduced');
-  if (Vid) Vid.init({ reduced: rm });        /* reduced：模块禁用，静态模式用海报 */
+  if (Vid) Vid.init({ reduced: rm,
+    onTourDone: function () { if (tour.on) stopTour(); },
+    onTourBreak: function () { tour.videoPaced = false; tour.startT = clamp(curP, 0, 0.999); tour.elapsed = 0; tour.dur = Math.max(6, (1 - tour.startT) * TOUR_FULL_SEC) * 1000; } });        /* reduced：模块禁用，静态模式用海报 */
   setTourBtn();
   syncMuteBtn();                              /* P1：静音钮初始状态 */
   window.addEventListener('load', measure);

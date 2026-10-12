@@ -119,6 +119,8 @@
     opts = opts || {};
     O.revealMs = opts.revealMs !== undefined ? opts.revealMs : REVEAL_MS;
     O.timeoutMs = opts.timeoutMs !== undefined ? opts.timeoutMs : TIMEOUT_MS;
+    O.onTourDone = opts.onTourDone || null;
+    O.onTourBreak = opts.onTourBreak || null;
     if (!hasDoc || opts.reduced) { st.disabled = true; return false; }  /* 静态模式不受影响 */
     var els = [];
     for (var i = 0; i < SEGS_DEF.length; i++) els.push(document.getElementById(SEGS_DEF[i].elId));
@@ -132,7 +134,7 @@
           status: 'idle', started: false, urlIdx: 0, blobUrl: null,
           dur: 0, reveal: 0, revealed: false, revealT0: 0,
           want: null, timer: 0, deadline: 0, playFail: false,
-          a: 0, op: 0, primed: false
+          a: 0, op: 0, primed: false, __idx: -1
         };
         el.playsInline = true;                        /* 移动端内联播放 */
         el.muted = true;                              /* scrub 恒静音 */
@@ -142,11 +144,18 @@
           el.setAttribute('webkit-playsinline', '');
         }
         el.style.opacity = 0;
-        ['play','pause','ended','error','stalled','waiting'].forEach(function (evn) {
+        ['play','pause','error','stalled','waiting'].forEach(function (evn) {
           el.addEventListener(evn, function () {
             if (window.__rec) window.__rec('seg:' + seg.id + ':' + evn,
               { ct: +el.currentTime.toFixed(2), muted: el.muted, rs: el.readyState });
           });
+        });
+        el.addEventListener('ended', function () {      /* 事件驱动漫游：播完即切（权威控制） */
+          if (window.__rec) window.__rec('seg:' + seg.id + ':ended', { ct: +el.currentTime.toFixed(2) });
+          if (evTour.on && segs[evTour.idx] === seg) {
+            if (evTour.idx + 1 < segs.length) evEngage(evTour.idx + 1);
+            else { evTour.on = false; if (O.onTourDone) O.onTourDone(); }
+          }
         });
         el.addEventListener('loadedmetadata', function () {
           if (seg.status !== 'loading') return;
@@ -157,6 +166,7 @@
         el.addEventListener('loadeddata', function () {
           if (seg.status !== 'loading' || !(seg.dur > 0)) return;
           seg.status = 'ready';
+          if (evTour.on && evTour.pending === seg.__idx) evEngage(evTour.pending);
           if (seg.timer) { win.clearTimeout(seg.timer); seg.timer = 0; }
           trySeek(seg, logic.segTime(st.lastP, seg.span, seg.dur), true);  /* seeked 后开始显影 */
         });
@@ -173,6 +183,7 @@
             seg.revealT0 = nowMs();
           }
         });
+        seg.__idx = segs.length;
         segs.push(seg);
       })(SEGS_DEF[i], els[i]);
     }
@@ -264,7 +275,7 @@
       if (seg.status === 'ready') {
         if (seg.revealed) seg.reveal = logic.revealAt(nowMs() - seg.revealT0, O.revealMs);
         a = seg.reveal;
-        var playing = st.touring && !st.tourPaused && st.engaged === i;
+        var playing = (st.touring && !st.tourPaused && st.engaged === i) || (evTour.on && evTour.idx === i);
         if (!playing) {                              /* scrub 态：暂停 + 静音 + 跟随进度 */
           if (!seg.el.paused) { try { seg.el.pause(); } catch (e) {} }
           if (!seg.el.muted) seg.el.muted = true;
@@ -294,6 +305,55 @@
   }
 
   /* ---------------- 自动漫游：三段 unmuted 顺序连播接管漫游节奏 ---------------- */
+  /* ================= 事件驱动漫游（v3，权威控制） =================
+   * 段切换只由视频 ended 事件触发，与 rAF 循环、进度阈值、scrollTo 回读
+   * 完全解耦——浮点地狱 / 后台冻结 / play 策略差异全部绕开。
+   * rAF 的 update() 只做"显示跟随"（scroll 跟着视频走），不做控制。 */
+  var evTour = { on: false, idx: -1, pending: -1 };
+
+  function evEngage(ci) {
+    var seg = segs[ci];
+    if (!seg || seg.status !== 'ready' || !(seg.dur > 0)) {
+      if (window.__rec) window.__rec('ev-stop', { why: 'seg-not-ready', ci: ci });
+      evTour.on = false;
+      releaseEngaged();
+      if (O.onTourDone) O.onTourDone();
+      return;
+    }
+    releaseEngaged();
+    evTour.idx = ci;
+    st.engaged = ci;
+    seg.el.muted = st.muted;
+    var t0 = logic.segTime(st.lastP, seg.span, seg.dur);
+    if (seg.el.ended || Math.abs(t0 - seg.el.currentTime) > 0.25) {
+      try { seg.el.currentTime = t0; } catch (e) {}
+      seg.want = t0;
+    }
+    if (window.__rec) window.__rec('ev-engage', { ci: ci, t0: +t0.toFixed(2), muted: seg.el.muted });
+    tryPlay(seg, ci);
+  }
+  function tourStartEv(fromP) {
+    if (!st.ready) return false;
+    st.lastP = clamp(fromP || 0, 0, 1);
+    evTour.on = true;
+    for (var li = 0; li < segs.length; li++) {          /* 漫游装载全部段（不依赖 rAF/p 预载） */
+      if (!segs[li].started && segs[li].status === 'idle') loadSeg(segs[li]);
+    }
+    evEngage(logic.coveringSeg(st.lastP));
+    return true;
+  }
+  function tourStopEv() {
+    evTour.on = false;
+    if (window.__rec) window.__rec('ev-stop', { why: 'shell', idx: evTour.idx });
+    releaseEngaged();
+  }
+  function tourDisplayP() {                 /* rAF 显示跟随用（非控制） */
+    if (!evTour.on || evTour.idx < 0) return null;
+    var seg = segs[evTour.idx];
+    if (!(seg && seg.dur > 0)) return null;
+    return logic.tourP(seg.span, seg.dur, seg.el.currentTime);
+  }
+
   /* 播放与自动播放策略兜底：未挂用户手势时 unmuted play 可能被拒——
    * 降级 muted 重试（声音由 WebAudio 音床继续承担），两次都失败才回匀速漫游 */
   function tryPlay(seg, ci) {
@@ -375,6 +435,7 @@
     document.addEventListener('visibilitychange', function () {
       if (!st.ready || !document.hidden || !segs) return;
       for (var i = 0; i < segs.length; i++) {
+        if (evTour.on && evTour.idx === i) continue;    /* 漫游中的当前段不暂停（ended 事件链不可断） */
         if (segs[i].status === 'ready' && !segs[i].el.paused) {
           try { segs[i].el.pause(); } catch (e) {}
         }
@@ -384,6 +445,10 @@
 
   /* ---------------- 导出 ---------------- */
   win.NEONVID = {
+    tourStartEv: tourStartEv,
+    tourStopEv: tourStopEv,
+    tourDisplayP: tourDisplayP,
+    evTourActive: function () { return evTour.on; },
     logic: logic,
     init: init,
     update: update,
