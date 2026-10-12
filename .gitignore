@@ -4,3 +4,8 @@ mm_*.py
 serve_nocache.py
 gen_posters.py
 codex-last-message.txt
+mm_*.txt
+_seamcheck/
+_discarded/
+biolum/PLAN-*.md
+.env
