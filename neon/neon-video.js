@@ -62,6 +62,7 @@
   var PRELOAD_AT = [0, 0.15, 0.45];/* seg1 立即；seg2 在 p>0.15、seg3 在 p>0.45 预载 */
   var SEEK_EPS = 1 / 48;           /* seek 节流阈值（24fps 的半帧） */
   var REVEAL_MS = 400;             /* 就绪后 海报→视频 显影交叉淡化时长 */
+  var XFADE_S = 0.45;              /* 漫游接缝交叠时长：下一段提前 XFADE_S 秒起播，运动对运动交叉淡化 */
   var TIMEOUT_MS = 8000;           /* 单段加载总预算（含备用 URL 重试） */
   var SEGS_DEF = [
     { id: 'seg1', elId: 'vid1', urls: ['assets/seg1-scrub.mp4', 'assets/seg1.mp4'], span: SPANS[0], poster: 'assets/keys2/k1.png' },
@@ -150,8 +151,24 @@
               { ct: +el.currentTime.toFixed(2), muted: el.muted, rs: el.readyState });
           });
         });
-        el.addEventListener('ended', function () {      /* 事件驱动漫游：播完即切（权威控制） */
+        el.addEventListener('timeupdate', function () {   /* ~4Hz，后台照常触发：交叠推进对 rAF 冻结免疫 */
+          if (evTour.on && !evTour.xfade && evTour.idx >= 0 && segs[evTour.idx] === seg &&
+              seg.dur > 0 && !seg.el.paused && seg.dur - seg.el.currentTime <= XFADE_S &&
+              evTour.idx + 1 < segs.length) {
+            var nx = segs[evTour.idx + 1];
+            if (nx.status === 'ready' && nx.dur > 0) {
+              evTour.xfade = { from: evTour.idx, to: evTour.idx + 1 };
+              evEngage(evTour.idx + 1, true);
+            }
+          }
+        });
+        el.addEventListener('ended', function () {
           if (window.__rec) window.__rec('seg:' + seg.id + ':ended', { ct: +el.currentTime.toFixed(2) });
+          if (evTour.xfade && segs[evTour.xfade.from] === seg) {
+            evTour.xfade = null;                /* 交叠出段自然结束：交叠完成 */
+            releaseSeg(seg);                    /* 暂停+静音（此时其透明度已为 0） */
+            return;
+          }
           if (evTour.on && segs[evTour.idx] === seg) {
             if (evTour.idx + 1 < segs.length) evEngage(evTour.idx + 1);
             else { evTour.on = false; if (O.onTourDone) O.onTourDone(); }
@@ -254,9 +271,10 @@
     for (var j = 1; j < segs.length; j++) {           /* seg2/seg3 预载 */
       if (!segs[j].started && p > PRELOAD_AT[j]) loadSeg(segs[j]);
     }
-    /* ---- 漫游接缝预热（消除切换顿挫）：当前段还剩 ≤1.2s 时，把下一段
-     * 提前 display 进布局并 seek 到 0（透明、暂停）——接缝切换时 play()
-     * 命中热的解码管线，不再出现冷启动的百毫秒级定格 ---- */
+    /* ---- 漫游：交叠推进检查（每帧） ---- */
+    if (evTour.on && !st.tourPaused) evAdvance();   /* 依赖模块自身漫游态，与外壳解耦 */
+    /* ---- 漫游接缝预热：当前段还剩 ≤1.2s 时，把下一段
+     * 提前 display 进布局并 seek 到 0（透明、暂停）——交叠起播命中热管线 ---- */
     if (st.touring && !st.tourPaused && st.engaged >= 0 && st.engaged + 1 < segs.length) {
       var cur = segs[st.engaged];
       var nx = segs[st.engaged + 1];
@@ -275,7 +293,9 @@
       if (seg.status === 'ready') {
         if (seg.revealed) seg.reveal = logic.revealAt(nowMs() - seg.revealT0, O.revealMs);
         a = seg.reveal;
-        var playing = (st.touring && !st.tourPaused && st.engaged === i) || (evTour.on && evTour.idx === i);
+        var playing = (st.touring && !st.tourPaused && st.engaged === i) ||
+                      (evTour.on && evTour.idx === i) ||
+                      (evTour.xfade && evTour.xfade.from === i);
         if (!playing) {                              /* scrub 态：暂停 + 静音 + 跟随进度 */
           if (!seg.el.paused) { try { seg.el.pause(); } catch (e) {} }
           if (!seg.el.muted) seg.el.muted = true;
@@ -291,6 +311,20 @@
     }
     if (st.touring && st.tourPaused && st.engaged >= 0 && !segs[st.engaged].el.paused) {
       try { segs[st.engaged].el.pause(); } catch (e) {}   /* 漫游暂停：视频同步暂停（保持 unmuted） */
+    }
+    /* 漫游接缝交叠：时间驱动交叉淡化 + 音量斜坡（k=入段已播时长/交叠时长） */
+    if (evTour.xfade) {
+      var fin = segs[evTour.xfade.to], fout = segs[evTour.xfade.from];
+      if (fin && fout && fin.dur > 0) {
+        var k = clamp(fin.el.currentTime / XFADE_S, 0, 1);
+        var ke = k * k * (3 - 2 * k);            /* smoothstep：无起止速度突变 */
+        var oOut = Math.round((1 - ke) * 1000) / 1000;
+        var oIn = Math.round(Math.max(fin.op, ke) * 1000) / 1000;
+        /* 直接写样式（当帧生效；loop 内的进度窗口计算被交叠时间轴取代） */
+        if (fout.el._o !== oOut) { fout.el._o = oOut; fout.el.style.opacity = oOut; }
+        if (fin.el._o !== oIn) { fin.el._o = oIn; fin.el.style.opacity = oIn; }
+        try { fout.el.volume = (1 - ke); fin.el.volume = Math.min(1, 0.55 + 0.45 * ke); } catch (e) {}
+      }
     }
     /* 海报兜底同步：仅当「当前覆盖段」失败时才把海报切到该段关键帧
      *（seg2 在前段区间预载失败时不提前切 k2，避免海报与所在区间不符） */
@@ -309,18 +343,24 @@
    * 段切换只由视频 ended 事件触发，与 rAF 循环、进度阈值、scrollTo 回读
    * 完全解耦——浮点地狱 / 后台冻结 / play 策略差异全部绕开。
    * rAF 的 update() 只做"显示跟随"（scroll 跟着视频走），不做控制。 */
-  var evTour = { on: false, idx: -1, pending: -1 };
+  var evTour = { on: false, idx: -1, pending: -1, xfade: null };  /* xfade = {from,to} 接缝交叠中 */
 
-  function evEngage(ci) {
+  function evEngage(ci, keepPrev) {
     var seg = segs[ci];
-    if (!seg || seg.status !== 'ready' || !(seg.dur > 0)) {
-      if (window.__rec) window.__rec('ev-stop', { why: 'seg-not-ready', ci: ci });
-      evTour.on = false;
+    if (!seg || seg.status === 'failed' || seg.playFail) {
+      if (window.__rec) window.__rec('ev-stop', { why: 'seg-failed', ci: ci });
+      evTour.on = false;                                /* 该段报废 → 交回外壳计时漫游兜底 */
       releaseEngaged();
-      if (O.onTourDone) O.onTourDone();
+      if (O.onTourBreak) O.onTourBreak();
       return;
     }
-    releaseEngaged();
+    if (seg.status !== 'ready' || !(seg.dur > 0)) {
+      evTour.pending = ci;                              /* 装载中 → 挂起等待（loadeddata 后续接） */
+      if (!seg.started) loadSeg(seg);
+      return;
+    }
+    evTour.pending = -1;
+    if (!keepPrev) releaseEngaged();            /* 交叠模式：前段继续播到自然结束 */
     evTour.idx = ci;
     st.engaged = ci;
     seg.el.muted = st.muted;
@@ -329,8 +369,23 @@
       try { seg.el.currentTime = t0; } catch (e) {}
       seg.want = t0;
     }
-    if (window.__rec) window.__rec('ev-engage', { ci: ci, t0: +t0.toFixed(2), muted: seg.el.muted });
+    try { seg.el.volume = 0.55; } catch (e) {}  /* 入段音量短斜坡 */
+    if (window.__rec) window.__rec('ev-engage', { ci: ci, t0: +t0.toFixed(2), overlap: !!keepPrev });
     tryPlay(seg, ci);
+  }
+
+  /* 漫游交叠推进：当前段还剩 XFADE_S 秒时启动下一段（ended 事件只负责最后一段收尾） */
+  function evAdvance() {
+    if (!evTour.on || evTour.idx < 0 || evTour.xfade) return;
+    var cur = segs[evTour.idx];
+    if (!cur || cur.status !== 'ready' || !(cur.dur > 0) || cur.el.paused) return;
+    if (cur.dur - cur.el.currentTime <= XFADE_S && evTour.idx + 1 < segs.length) {
+      var nx = segs[evTour.idx + 1];
+      if (nx.status === 'ready' && nx.dur > 0) {
+        evTour.xfade = { from: evTour.idx, to: evTour.idx + 1 };
+        evEngage(evTour.idx + 1, true);         /* keepPrev：两段同时播放，update 里做时间驱动交叉淡化 */
+      }
+    }
   }
   function tourStartEv(fromP) {
     if (!st.ready) return false;
@@ -342,9 +397,16 @@
     evEngage(logic.coveringSeg(st.lastP));
     return true;
   }
+  function releaseSeg(seg) {
+    try { seg.el.pause(); } catch (e) {}
+    seg.el.muted = true;
+    try { seg.el.volume = 1; } catch (e) {}
+  }
   function tourStopEv() {
     evTour.on = false;
+    evTour.xfade = null;
     if (window.__rec) window.__rec('ev-stop', { why: 'shell', idx: evTour.idx });
+    for (var vi = 0; vi < segs.length; vi++) { try { segs[vi].el.volume = 1; } catch (e) {} }
     releaseEngaged();
   }
   function tourDisplayP() {                 /* rAF 显示跟随用（非控制） */
