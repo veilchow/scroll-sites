@@ -112,21 +112,13 @@
   }
   body[data-chapter="3"] .t-kicker{color:var(--warm)}
   /* 首屏 hero：品牌版式 + CTA（仅第一章，滚动后随标题窗一起淡出） */
-  .hero .t-main{font-size:clamp(30px,5.4vw,64px);font-weight:700}
-  .hero .t-sub{max-width:46ch}
-  .hero-cta{display:flex;gap:14px;margin-top:26px;flex-wrap:wrap}
-  .hero-cta button{
-    font-family:var(--mono);font-size:12px;letter-spacing:.18em;
-    padding:12px 20px;border-radius:999px;cursor:pointer;
-    color:var(--ink);background:rgba(8,14,32,.45);border:1px solid rgba(143,232,255,.45);
-    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-    transition:border-color .3s,box-shadow .3s,transform .3s;
+  .hero .t-main{font-size:clamp(32px,5.8vw,68px);font-weight:700;line-height:1.18;letter-spacing:.02em}
+  .hero .t-kicker{letter-spacing:.5em;font-size:10px}
+  .hero .t-sub{max-width:40ch;font-size:clamp(13px,1.25vw,16px);line-height:2.0}
+  .hero-meta{
+    margin-top:26px;font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--mut);
+    padding-top:14px;border-top:1px solid rgba(143,232,255,.14);max-width:44ch;
   }
-  .hero-cta button .i{margin:0 8px 0 0;color:var(--cyan)}
-  .hero-cta button:last-child .i{margin:0 0 0 8px}
-  .hero-cta button:hover{border-color:var(--cyan);box-shadow:0 0 24px rgba(120,210,255,.25);transform:translateY(-1px)}
-  .hero-alt{align-self:center;font-size:11px;letter-spacing:.14em;color:var(--mut)}
-  .hero-meta{margin-top:20px;font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--mut)}
   body.reduced .title{transition:opacity .5s ease,transform .5s ease}
   body.reduced .title.active{opacity:1;transform:none}
 
@@ -316,12 +308,9 @@
     .title:not(.hero) .t-sub{display:none}
     #titles{left:6vw;right:14vw;top:9vh;bottom:auto;align-content:start;max-width:none}
     .t-main{font-size:clamp(22px,6.4vw,34px)}
-    .hero .t-main{font-size:clamp(26px,7.4vw,40px)}
-    .hero .t-sub{display:block;font-size:12px;line-height:1.8;max-width:34ch}
-    .hero-cta{margin-top:18px;gap:10px}
-    .hero-cta button{padding:10px 15px;font-size:11px;letter-spacing:.12em}
-    .hero-alt{align-self:center;font-size:11px;letter-spacing:.14em;color:var(--mut)}
-  .hero-meta{font-size:9px;letter-spacing:.14em;margin-top:14px;max-width:90vw}
+    .hero .t-main{font-size:clamp(26px,7.6vw,40px)}
+    .hero .t-sub{display:block;font-size:12.5px;line-height:1.9;max-width:32ch}
+    .hero-meta{font-size:9px;letter-spacing:.14em;margin-top:14px;max-width:88vw}
     .track{height:24vh}
     #progress{right:10px}
     #tour-btn{right:12px;bottom:64px;padding:8px 13px;font-size:11px}
@@ -378,13 +367,9 @@
 <div id="titles" class="ui" aria-live="polite">
   <section class="title hero" id="title-0">
     <p class="t-kicker">ASTRA PROJECT · 深空信标计划</p>
-    <h1 class="t-main">出发，去寂静深处。</h1>
-    <p class="t-sub">远航船「辰星」已航行一百一十二年，目的地是一座久未应答的信标站。滚动滚轮接管驾驶——往下是接近，往上是回望。</p>
-    <div class="hero-cta">
-      <button id="hero-tour" type="button"><span class="i">▶</span>开始旅程</button>
-      <span class="hero-alt">或随时滚动 / 滑动，惯性接管</span>
-    </div>
-    <p class="hero-meta">三章旅程 · 航程 120.0 KM · 建议开启声音（点击任意处激活 · M 静音 · H 口播模式）</p>
+    <h1 class="t-main">一座信标站，<br>沉默了一万年。</h1>
+    <p class="t-sub">今夜它将要醒来。滚动即航行——每一次滚动都向它逼近一程，停下，星辰也为你静止。</p>
+    <p class="hero-meta">三章 · 航程 120.0 KM · 自动漫游见右下 · 建议开启声音</p>
   </section>
   <section class="title" id="title-1">
     <p class="t-kicker">CHAPTER 02 · RENDEZVOUS</p>

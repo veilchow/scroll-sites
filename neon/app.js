@@ -403,14 +403,6 @@
     });
   }
 
-  /* 首屏 hero CTA：开始旅程（任何输入自动接管） */
-  var heroTour = document.getElementById('hero-tour');
-  if (heroTour) heroTour.addEventListener('click', function () {
-    heroTour.blur();
-    soundKick();
-    startTour();
-  });
-
   window.addEventListener('keydown', function (e) {
     var t = e.target, tag = t && t.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;

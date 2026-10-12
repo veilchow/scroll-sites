@@ -404,65 +404,6 @@
   tourBtn.addEventListener('click', function () { tourBtn.blur(); startTour(); });
 
   /* 首屏 hero CTA：接管自动漫游 / 提示滚动接管 */
-  var heroTour = doc.getElementById('hero-tour');
-  if (heroTour) heroTour.addEventListener('click', function () {
-    heroTour.blur();
-    if (Aud) Aud.unlock();
-    startTour();
-  });
-
-  /* ================= 页面不可见时暂停 rAF ================= */
-  doc.addEventListener('visibilitychange', function () {
-    if (st.reduced) return;
-    if (doc.hidden) {
-      if (st.raf) win.cancelAnimationFrame(st.raf);
-      st.running = false;
-    } else if (!st.running) {
-      st.running = true;
-      st.lastTs = 0;
-      st.raf = win.requestAnimationFrame(frame);
-    }
-  });
-
-  /* ================= resize 防抖重建 ================= */
-  var rzTimer = 0, lastW = 0, lastH = 0;
-  win.addEventListener('resize', function () {
-    win.clearTimeout(rzTimer);
-    rzTimer = win.setTimeout(function () {
-      var w = win.innerWidth, h = win.innerHeight;
-      var big = Math.abs(w - lastW) > 2 || Math.abs(h - lastH) > 140;  /* 忽略移动端地址栏微变 */
-      if (!big && !st.reduced) return;
-      lastW = w; lastH = h;
-      measure(true);
-      if (st.reduced) setReducedChapter(st.reducedIdx);
-    }, 160);
-  }, { passive: true });
-
-  /* ================= 静态模式（prefers-reduced-motion） ================= */
-  function setReducedChapter(i, noFade) {
-    st.reducedIdx = clamp(i, 0, 2);
-    for (var k = 0; k < titles.length; k++) {
-      var el = titles[k];
-      el.style.opacity = '';
-      el.style.transform = '';
-      el._o = null; el._ty = null;
-      el.classList.toggle('active', k === st.reducedIdx);
-    }
-    for (k = 0; k < navBtns.length; k++) navBtns[k].classList.toggle('active', k === st.reducedIdx);
-    for (k = 0; k < dots.length; k++) dots[k].classList.toggle('active', k === st.reducedIdx);
-    st.current = REDUCED_KEYS[st.reducedIdx];
-    st.clock = 1.7;
-    st.speed = 0;
-    st.target = st.current;
-    if (posterEl) posterEl.src = POSTERS[st.reducedIdx];   /* 静态模式 = 关键帧海报 */
-    /* P1 反馈层：静态模式下 HUD 显示对应章读数（无动画无 sting），音床跟随章切换 */
-    if (Aud) Aud.setChapter(st.reducedIdx + 1);
-    if (Hud) Hud.update({
-      p: st.current, speed: 0, dt: 0, clock: st.clock,
-      touring: false, gliding: false, introDone: true
-    });
-    void noFade;
-  }
   function switchReduced(i) {
     i = clamp(i, 0, 2);
     if (i === st.reducedIdx) return;
