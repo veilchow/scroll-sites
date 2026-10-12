@@ -30,6 +30,17 @@
  * ========================================================================== */
 (function () {
   'use strict';
+  if (typeof window !== 'undefined' && !window.__rec) {
+    window.__rec = function (ev, d) {
+      try {
+        var a = JSON.parse(sessionStorage.getItem('tourLog') || '[]');
+        a.push(Object.assign({ t: Math.round(performance.now()), ev: ev }, d || {}));
+        if (a.length > 500) a.splice(0, a.length - 500);
+        sessionStorage.setItem('tourLog', JSON.stringify(a));
+      } catch (e) {}
+    };
+  }
+
 
   var win = (typeof window !== 'undefined') ? window : {};
   var hasDoc = (typeof document !== 'undefined');
@@ -131,6 +142,12 @@
           el.setAttribute('webkit-playsinline', '');
         }
         el.style.opacity = 0;
+        ['play','pause','ended','error','stalled','waiting'].forEach(function (evn) {
+          el.addEventListener(evn, function () {
+            if (window.__rec) window.__rec('seg:' + seg.id + ':' + evn,
+              { ct: +el.currentTime.toFixed(2), muted: el.muted, rs: el.readyState });
+          });
+        });
         el.addEventListener('loadedmetadata', function () {
           if (seg.status !== 'loading') return;
           var d = el.duration;
@@ -280,8 +297,10 @@
   /* 播放与自动播放策略兜底：未挂用户手势时 unmuted play 可能被拒——
    * 降级 muted 重试（声音由 WebAudio 音床继续承担），两次都失败才回匀速漫游 */
   function tryPlay(seg, ci) {
+    if (window.__rec) window.__rec('tryPlay', { seg: seg.id, muted: seg.el.muted });
     var pr = seg.el.play();
     if (pr && pr.catch) pr.catch(function () {
+      if (window.__rec) window.__rec('play-rejected', { seg: seg.id });
       if (!seg.el.muted) {
         seg.el.muted = true;
         var p2 = seg.el.play();
@@ -298,6 +317,7 @@
 
   function releaseEngaged() {
     if (st.engaged < 0) return;
+    if (window.__rec) window.__rec('release', { was: st.engaged, ct: +segs[st.engaged].el.currentTime.toFixed(2) });
     var seg = segs[st.engaged];
     st.engaged = -1;
     try { seg.el.pause(); } catch (e) {}
@@ -310,10 +330,12 @@
     var ci = logic.coveringSeg(p);
     var seg = ci >= 0 ? segs[ci] : null;
     if (!seg || seg.status !== 'ready' || seg.playFail || !(seg.dur > 0)) {
+      if (window.__rec) window.__rec('seg-unavailable', { ci: ci, status: seg ? seg.status : 'none', playFail: seg ? seg.playFail : null, p: +p.toFixed(4) });
       releaseEngaged();                               /* 段未就绪/失败 → 外壳回 45s 匀速漫游 */
       return null;
     }
     if (st.engaged !== ci) {                          /* 播完一段接下一段（或中途接入） */
+      if (window.__rec) window.__rec('engage', { ci: ci, p: +p.toFixed(4), status: seg.status, ct: +seg.el.currentTime.toFixed(2), muted: seg.el.muted });
       releaseEngaged();
       st.engaged = ci;
       seg.el.muted = st.muted;                        /* 漫游放开原声（尊重全局静音） */

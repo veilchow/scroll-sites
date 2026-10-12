@@ -120,7 +120,9 @@
       var vp = Vid ? Vid.tourSync(st.current) : null;    /* null = 该区间无视频接管 */
       if (vp !== null) {
         st.tour.videoPaced = true;
-        win.scrollTo(0, vp * st.scrollable);
+        /* 视频时钟直通（同 NEON 修复）：vp 直接作为当前进度，绕开接缝浮点地狱 */
+        st.current = vp;
+        win.scrollTo(0, Math.round(vp * st.scrollable));
         if (vp >= 0.9995) endTour();
       } else {
         if (st.tour.videoPaced) {                         /* 视频段播完 → 从当前进度重定节奏 */

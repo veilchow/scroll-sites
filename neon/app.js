@@ -10,6 +10,17 @@
  * ============================================================ */
 (function () {
   'use strict';
+  if (typeof window !== 'undefined' && !window.__rec) {
+    window.__rec = function (ev, d) {
+      try {
+        var a = JSON.parse(sessionStorage.getItem('tourLog') || '[]');
+        a.push(Object.assign({ t: Math.round(performance.now()), ev: ev }, d || {}));
+        if (a.length > 500) a.splice(0, a.length - 500);
+        sessionStorage.setItem('tourLog', JSON.stringify(a));
+      } catch (e) {}
+    };
+  }
+
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
   function ss(a, b, x) {
     if (b === a) return x >= a ? 1 : 0;
@@ -172,6 +183,7 @@
     tourBtn.textContent = !tour.on ? '▶ 自动漫游' : (tour.paused ? '▶ 继续漫游' : '⏸ 暂停漫游');
   }
   function startTour() {
+    if (window.__rec) window.__rec('startTour', { p: +(curP || 0).toFixed(3) });
     if (rm) return;
     tour.on = true;
     tour.paused = false;
@@ -185,6 +197,7 @@
     if (SND) SND.blip(true);                 // P1：漫游启动确认音
   }
   function stopTour() {
+    if (window.__rec) window.__rec('stopTour', { p: +(curP || 0).toFixed(3) });
     tour.on = false;
     tour.paused = false;
     tour.videoPaced = false;
@@ -212,11 +225,16 @@
     var vp = Vid ? Vid.tourSync(curP) : null;
     if (vp !== null) {
       tour.videoPaced = true;
-      window.scrollTo(0, vp * maxScroll);
+      /* 视频时钟直通：vp 直接作为当前进度（视频是漫游的权威时钟），
+       * 不再经 scrollTo→scrollY/maxScroll 换算回读——那会在接缝处
+       * 产生 0.65999… 的浮点地狱，段界判定永远跨不过去（卡 66% 事故） */
+      curP = vp;
+      window.scrollTo(0, Math.round(vp * maxScroll));
       if (vp >= 0.9995) stopTour();
       return;
     }
     if (tour.videoPaced) {                    // 视频段结束/不可用 → 从当前进度重定匀速节奏
+      if (window.__rec) window.__rec('tour-fallback', { p: +curP.toFixed(4) });
       tour.videoPaced = false;
       tour.startT = clamp(curP, 0, 0.999);
       tour.elapsed = 0;
