@@ -29,9 +29,10 @@ def extract_frame(video, which, out):
 
 def ssim(a, b):
     r = subprocess.run(["ffmpeg", "-i", a, "-i", b, "-lavfi",
-                        "scale=640:-2,ssim", "-f", "null", "-"], capture_output=True, text=True)
-    m = re.search(r"All:\d+(\.\d+)?\s*\(([\d.]+)\)", r.stderr)
-    return float(m.group(2)) if m else 0.0
+                        "[0:v]scale=640:-2[a];[1:v]scale=640:-2[b];[a][b]ssim", "-f", "null", "-"],
+                       capture_output=True, text=True)
+    m = re.search(r"All:([\d.]+)", r.stderr)
+    return float(m.group(1)) if m else 0.0
 
 all_pass = True
 for s in SEGS:
