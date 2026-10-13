@@ -381,9 +381,26 @@ kbd{
   #hud.spd .hud-big,#hud.spd .hud-loc b{filter:none}
   #hud-arrive.lit{animation:none}
 }
+
+  /* 主题加载屏 */
+  #preloader{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:18px;background:#0a0618;transition:opacity .8s ease,visibility .8s}
+  #preloader.done{opacity:0;visibility:hidden;pointer-events:none}
+  #preloader .pl-anim{width:48px;height:48px;position:relative}
+  #preloader .pl-anim.star::before,#preloader .pl-anim.star::after{content:'';position:absolute;left:50%;top:50%;width:3px;height:3px;border-radius:50%;background:#ff5fa8;box-shadow:0 0 10px rgba(255,95,168,.3);animation:pl-star 2s ease-in-out infinite}
+  #preloader .pl-anim.star::after{animation-delay:1s}
+  @keyframes pl-star{0%,100%{transform:translate(-50%,-50%) scale(0);opacity:0}50%{transform:translate(-50%,-50%) scale(3);opacity:1}}
+  #preloader .pl-anim.glow{width:52px;height:52px;border-radius:50%;background:radial-gradient(circle,rgba(255,95,168,.3) 0%,transparent 70%);animation:pl-glow 2.4s ease-in-out infinite}
+  @keyframes pl-glow{0%,100%{transform:scale(.6);opacity:.3}50%{transform:scale(1.2);opacity:1}}
+  #preloader .pl-anim.rain{width:2px;height:36px;background:linear-gradient(180deg,transparent,#ff5fa8);animation:pl-rain 1.2s ease-in infinite;border-radius:2px}
+  @keyframes pl-rain{0%{transform:translateY(-20px);opacity:0}30%{opacity:1}100%{transform:translateY(24px);opacity:0}}
+  #preloader .pl-title{font-family:var(--mono,monospace);font-size:12px;letter-spacing:.5em;color:#ff5fa8;opacity:.8}
+  #preloader .pl-sub{font-family:var(--mono,monospace);font-size:9px;letter-spacing:.3em;color:rgba(255,255,255,.3);animation:pl-sub-pulse 2s ease-in-out infinite}
+  @keyframes pl-sub-pulse{0%,100%{opacity:.2}50%{opacity:.6}}
+  @media(prefers-reduced-motion:reduce){#preloader .pl-anim,#preloader .pl-sub{animation:none}}
 </style>
 </head>
 <body>
+  <div id="preloader" aria-hidden="true"><div class="pl-anim rain"></div><div class="pl-title">NEON DRIFT</div><div class="pl-sub">CITY SIGNAL</div></div>
 
 <div id="spacer" aria-hidden="true"></div>
 
@@ -490,7 +507,23 @@ kbd{
 </div>
 
 <noscript>
-  <style>#stage{background:#04030c url(assets/keys2/k1.png) center/cover no-repeat}</style>
+  <style>#stage{background:#04030c url(assets/keys2/k1.png) center/cover no-repeat}
+  /* 主题加载屏 */
+  #preloader{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:18px;background:#0a0618;transition:opacity .8s ease,visibility .8s}
+  #preloader.done{opacity:0;visibility:hidden;pointer-events:none}
+  #preloader .pl-anim{width:48px;height:48px;position:relative}
+  #preloader .pl-anim.star::before,#preloader .pl-anim.star::after{content:'';position:absolute;left:50%;top:50%;width:3px;height:3px;border-radius:50%;background:#ff5fa8;box-shadow:0 0 10px rgba(255,95,168,.3);animation:pl-star 2s ease-in-out infinite}
+  #preloader .pl-anim.star::after{animation-delay:1s}
+  @keyframes pl-star{0%,100%{transform:translate(-50%,-50%) scale(0);opacity:0}50%{transform:translate(-50%,-50%) scale(3);opacity:1}}
+  #preloader .pl-anim.glow{width:52px;height:52px;border-radius:50%;background:radial-gradient(circle,rgba(255,95,168,.3) 0%,transparent 70%);animation:pl-glow 2.4s ease-in-out infinite}
+  @keyframes pl-glow{0%,100%{transform:scale(.6);opacity:.3}50%{transform:scale(1.2);opacity:1}}
+  #preloader .pl-anim.rain{width:2px;height:36px;background:linear-gradient(180deg,transparent,#ff5fa8);animation:pl-rain 1.2s ease-in infinite;border-radius:2px}
+  @keyframes pl-rain{0%{transform:translateY(-20px);opacity:0}30%{opacity:1}100%{transform:translateY(24px);opacity:0}}
+  #preloader .pl-title{font-family:var(--mono,monospace);font-size:12px;letter-spacing:.5em;color:#ff5fa8;opacity:.8}
+  #preloader .pl-sub{font-family:var(--mono,monospace);font-size:9px;letter-spacing:.3em;color:rgba(255,255,255,.3);animation:pl-sub-pulse 2s ease-in-out infinite}
+  @keyframes pl-sub-pulse{0%,100%{opacity:.2}50%{opacity:.6}}
+  @media(prefers-reduced-motion:reduce){#preloader .pl-anim,#preloader .pl-sub{animation:none}}
+</style>
   <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#04030c;color:#e9e6f7;z-index:99;text-align:center;padding:24px">
     本页面需要启用 JavaScript 才能呈现雨夜漫游场景。
   </div>
@@ -500,5 +533,6 @@ kbd{
 <script src="feedback.js"></script>
 <script src="neon-video.js"></script>
 <script src="app.js"></script>
+<script>setTimeout(function(){var p=document.getElementById('preloader');if(p)p.classList.add('done')},8000)</script>
 </body>
 </html>

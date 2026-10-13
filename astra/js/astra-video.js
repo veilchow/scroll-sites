@@ -42,14 +42,21 @@
   /* ---------------- 常量 ---------------- */
   var SEAM1 = [0.525, 0.575];      /* 55% 接缝交叉淡化窗口（seg1 尾帧与 seg2 首帧同构图） */
   var SPANS = [[0, 0.55], [0.55, 1.0]];   /* 两段覆盖全程 0–100% */
-  var PRELOAD_AT = 0.12;           /* seg2 预载进度阈值（漫游约 6.6s 到接缝，留足预载余量） */
+  var PRELOAD_AT = IS_MOBILE ? 0.18 : 0.12;           /* seg2 预载进度阈值（漫游约 6.6s 到接缝，留足预载余量） */
   var SEEK_EPS = 1 / 48;           /* seek 节流阈值（24fps 的半帧） */
   var REVEAL_MS = 400;             /* 就绪后 海报→视频 显影交叉淡化时长 */
   var XFADE_S = 0.45;              /* 漫游接缝交叠：下一段提前 0.45s 起播，运动对运动交叉淡化 */
   var TIMEOUT_MS = 8000;           /* 单段加载总预算（含备用 URL 重试） */
+  
+  /* 移动端检测：轻量视频（720p, ~2MB/段 vs 桌面 15MB/段） */
+  var IS_MOBILE = (typeof window !== 'undefined' && (
+    /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+    (window.innerWidth || 960) < 768
+  ));
+
   var SEGS_DEF = [
-    { id: 'seg1', elId: 'vid1', urls: ['assets/seg1-scrub.mp4', 'assets/seg1.mp4'], span: SPANS[0], poster: 'assets/approach.png' },
-    { id: 'seg2', elId: 'vid2', urls: ['assets/seg2-scrub.mp4', 'assets/seg2.mp4'], span: SPANS[1], poster: 'assets/core.png' }
+    { id: 'seg1', elId: 'vid1', urls: IS_MOBILE ? ['assets/seg1-mobile.mp4', 'assets/seg1-scrub.mp4'] : ['assets/seg1-scrub.mp4', 'assets/seg1-mobile.mp4'], span: SPANS[0], poster: 'assets/approach.png' },
+    { id: 'seg2', elId: 'vid2', urls: IS_MOBILE ? ['assets/seg2-mobile.mp4', 'assets/seg2-scrub.mp4'] : ['assets/seg2-scrub.mp4', 'assets/seg2-mobile.mp4'], span: SPANS[1], poster: 'assets/core.png' }
   ];
 
   /* ================= 纯逻辑（Node 桩测试对象） ================= */
@@ -164,6 +171,8 @@
           }
           if (!seg.revealed && seg.status === 'ready') {
             seg.revealed = true;
+            var pl = document.getElementById('preloader');
+            if (pl) pl.classList.add('done');
             seg.revealT0 = nowMs();
             var lb0 = document.getElementById('loading');
             if (lb0) lb0.classList.add('done');

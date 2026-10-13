@@ -64,10 +64,17 @@
   var REVEAL_MS = 400;             /* 就绪后 海报→视频 显影交叉淡化时长 */
   var XFADE_S = 0.45;              /* 漫游接缝交叠时长：下一段提前 XFADE_S 秒起播，运动对运动交叉淡化 */
   var TIMEOUT_MS = 8000;           /* 单段加载总预算（含备用 URL 重试） */
+  
+  /* 移动端检测：轻量视频（720p, ~2MB/段 vs 桌面 15MB/段） */
+  var IS_MOBILE = (typeof window !== 'undefined' && (
+    /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+    (window.innerWidth || 960) < 768
+  ));
+
   var SEGS_DEF = [
-    { id: 'seg1', elId: 'vid1', urls: ['assets/seg1-scrub.mp4', 'assets/seg1.mp4'], span: SPANS[0], poster: 'assets/keys/k1.png' },
-    { id: 'seg2', elId: 'vid2', urls: ['assets/seg2-scrub.mp4', 'assets/seg2.mp4'], span: SPANS[1], poster: 'assets/keys/k2.png' },
-    { id: 'seg3', elId: 'vid3', urls: ['assets/seg3-scrub.mp4', 'assets/seg3.mp4'], span: SPANS[2], poster: 'assets/keys/k4.png' }
+    { id: 'seg1', elId: 'vid1', urls: IS_MOBILE ? ['assets/seg1-mobile.mp4', 'assets/seg1-scrub.mp4'] : ['assets/seg1-scrub.mp4', 'assets/seg1-mobile.mp4'], span: SPANS[0], poster: 'assets/keys/k1.png' },
+    { id: 'seg2', elId: 'vid2', urls: IS_MOBILE ? ['assets/seg2-mobile.mp4', 'assets/seg2-scrub.mp4'] : ['assets/seg2-scrub.mp4', 'assets/seg2-mobile.mp4'], span: SPANS[1], poster: 'assets/keys/k2.png' },
+    { id: 'seg3', elId: 'vid3', urls: IS_MOBILE ? ['assets/seg3-mobile.mp4', 'assets/seg3-scrub.mp4'] : ['assets/seg3-scrub.mp4', 'assets/seg3-mobile.mp4'], span: SPANS[2], poster: 'assets/keys/k4.png' }
   ];
 
   /* ================= 纯逻辑（Node 桩测试对象） ================= */
@@ -197,6 +204,8 @@
           }
           if (!seg.revealed && seg.status === 'ready') {
             seg.revealed = true;
+            var pl = document.getElementById('preloader');
+            if (pl) pl.classList.add('done');
             seg.revealT0 = nowMs();
             var lb0 = document.getElementById('loading');
             if (lb0) lb0.classList.add('done');
