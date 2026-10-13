@@ -97,6 +97,20 @@
   var O = { revealMs: REVEAL_MS, timeoutMs: TIMEOUT_MS };
 
   function init(opts) {
+    /* MOBILE_SCRUB_OFF: 移动端禁用视频 scrub（iOS/Android 的 currentTime 快速 seek 机制性卡死）。
+     * 画面改由外壳的 mobileCamera() 海报+CSS 变换驱动。
+     * 漫游模式仍可用：tourStartEv() 单独启动视频正常播放（play，不 seek）。 */
+    if (IS_MOBILE) {
+      st.disabled = true;
+      var _mp = document.getElementById('poster');
+      if (_mp) { _mp.style.opacity = 1; _mp.style.display = 'block'; _mp.src = _mp.src || ''; }
+      var _ml = document.getElementById('loading');
+      if (_ml) _ml.style.display = 'none';
+      var _pl = document.getElementById('preloader');
+      if (_pl) _pl.classList.add('done');
+      if (typeof window !== 'undefined') window.__isMobileSite = true;
+      return false;
+    }
     opts = opts || {};
     O.revealMs = opts.revealMs !== undefined ? opts.revealMs : REVEAL_MS;
     O.timeoutMs = opts.timeoutMs !== undefined ? opts.timeoutMs : TIMEOUT_MS;
@@ -409,6 +423,31 @@
     }
   }
   function tourStartEv(fromP) {
+    /* 移动端漫游：跳过 scrub 禁用，直接正常播放（play，不 seek） */
+    if (IS_MOBILE) {
+      if (!segs) {
+        /* 延迟初始化：只建 DOM 引用，不做 Blob 加载 */
+        st.ready = true;
+        segs = [];
+        for (var mi = 0; mi < SEGS_DEF.length; mi++) {
+          (function(def) {
+            var el = document.getElementById(def.elId);
+            if (!el) return;
+            el.playsInline = true; el.muted = false;
+            el.setAttribute('playsinline', '');
+            el.src = def.urls[def.urls.length - 1];  /* 用最后一个 URL（原画质 mp4） */
+            el.style.display = 'none';
+            segs.push({ id: def.id, urls: def.urls, span: def.span, el: el, poster: def.poster,
+              status: 'idle', dur: 6.58, reveal: 1, revealed: true, want: null, a: 0, op: 0, primed: false });
+          })(SEGS_DEF[mi]);
+        }
+      }
+      evTour.on = true;
+      /* 直接播当前段 */
+      var ci = logic.coveringSeg(clamp(fromP || 0, 0, 1));
+      evEngage(ci);
+      return true;
+    }
     if (!st.ready) return false;
     st.lastP = clamp(fromP || 0, 0, 1);
     evTour.on = true;

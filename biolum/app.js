@@ -274,6 +274,56 @@
     syncUI(targetP);
   }
 
+
+  /* ================= 移动端海报相机（替代视频 scrub） =================
+   * 原理：高清关键帧（1672px）+ CSS transform 模拟镜头推进
+   * 每章内：scale 1.0→1.28（缓动推进）+ 轻微纵移
+   * 章界处：cross-fade 切换关键帧
+   * 漫游时：隐藏海报，显示正在播放的视频 */
+  var MC_POSTERS = ['assets/keys/k1.png', 'assets/keys/k2.png', 'assets/keys/k4.png'];
+  var MC_CH = [0, 0.333, 0.667, 1];
+  var mcIdx = -1;
+
+  function mobileCamera(curP) {
+    var posterEl = document.getElementById('poster');
+    if (!posterEl || !window.__isMobileSite) return;
+
+    /* 漫游中：隐藏海报（视频正在播） */
+    if (typeof BIOVID !== 'undefined' && BIOVID && BIOVID.evTourActive && BIOVID.evTourActive()) {
+      posterEl.style.opacity = 0;
+      return;
+    }
+    posterEl.style.opacity = 1;
+
+    /* 章节判定 */
+    var idx = 0;
+    for (var ci = 1; ci < 3; ci++) { if (curP >= MC_CH[ci]) idx = ci; }
+
+    /* 章界 cross-fade */
+    if (idx !== mcIdx) {
+      mcIdx = idx;
+      var target = MC_POSTERS[idx];
+      if (posterEl.src.indexOf(target.split('/').pop()) === -1) {
+        posterEl.style.opacity = 0;
+        setTimeout(function() {
+          posterEl.src = target;
+          posterEl.style.opacity = 1;
+        }, 250);
+      }
+    }
+
+    /* 章内 CSS 相机：缓动推进 + 纵移 */
+    var chS = MC_CH[idx], chE = MC_CH[idx + 1];
+    var lp = Math.max(0, Math.min(1, (curP - chS) / (chE - chS)));
+    var e = lp * lp * (3 - 2 * lp);  /* smoothstep */
+
+    var scale = 1.02 + e * 0.26;
+    var ty = (0.5 - e) * 4;
+    posterEl.style.transform = 'scale(' + scale.toFixed(4) + ') translateY(' + ty.toFixed(2) + 'vh)';
+    posterEl.style.willChange = 'transform, opacity';
+    posterEl.style.transition = 'opacity .3s ease';
+  }
+
   /* ---------- 主循环（rAF 单循环：无引擎渲染） ---------- */
   function loop(now) {
     rafId = window.requestAnimationFrame(loop);
@@ -312,6 +362,7 @@
         tourPaused: tour.on && tour.paused
       });
       syncUI(curP);
+      mobileCamera(curP);
       fxFrame(dt, curP, false);
       /* 舞台微颤：幅度随滚动速度（纯显示层平移，作用于 #stage 整体；
          由平滑速度驱动 —— 停滚即停；与穿越 shake/bio-pulse 动画天然共存） */

@@ -89,6 +89,56 @@
     }
   }
 
+
+  /* ================= 移动端海报相机（替代视频 scrub） =================
+   * 原理：高清关键帧（1672px）+ CSS transform 模拟镜头推进
+   * 每章内：scale 1.0→1.28（缓动推进）+ 轻微纵移
+   * 章界处：cross-fade 切换关键帧
+   * 漫游时：隐藏海报，显示正在播放的视频 */
+  var MC_POSTERS = ['assets/approach.png', 'assets/port.png', 'assets/core.png'];
+  var MC_CH = [0, 0.55, 0.75, 1];
+  var mcIdx = -1;
+
+  function mobileCamera(mcP) {
+    var posterEl = document.getElementById('poster');
+    if (!posterEl || !window.__isMobileSite) return;
+
+    /* 漫游中：隐藏海报（视频正在播） */
+    if (typeof AstraVideo !== 'undefined' && AstraVideo && AstraVideo.evTourActive && AstraVideo.evTourActive()) {
+      posterEl.style.opacity = 0;
+      return;
+    }
+    posterEl.style.opacity = 1;
+
+    /* 章节判定 */
+    var idx = 0;
+    for (var ci = 1; ci < 3; ci++) { if (mcP >= MC_CH[ci]) idx = ci; }
+
+    /* 章界 cross-fade */
+    if (idx !== mcIdx) {
+      mcIdx = idx;
+      var target = MC_POSTERS[idx];
+      if (posterEl.src.indexOf(target.split('/').pop()) === -1) {
+        posterEl.style.opacity = 0;
+        setTimeout(function() {
+          posterEl.src = target;
+          posterEl.style.opacity = 1;
+        }, 250);
+      }
+    }
+
+    /* 章内 CSS 相机：缓动推进 + 纵移 */
+    var chS = MC_CH[idx], chE = MC_CH[idx + 1];
+    var lp = Math.max(0, Math.min(1, (mcP - chS) / (chE - chS)));
+    var e = lp * lp * (3 - 2 * lp);  /* smoothstep */
+
+    var scale = 1.02 + e * 0.26;
+    var ty = (0.5 - e) * 4;
+    posterEl.style.transform = 'scale(' + scale.toFixed(4) + ') translateY(' + ty.toFixed(2) + 'vh)';
+    posterEl.style.willChange = 'transform, opacity';
+    posterEl.style.transition = 'opacity .3s ease';
+  }
+
   /* ================= rAF 主循环 ================= */
   var frameArmored = 0;
   function frame(ts) {
@@ -191,6 +241,7 @@
 
     /* 5) UI/DOM 更新 */
     updateDOM();
+    mobileCamera(st.current);
 
     /* 6) P1 反馈层：HUD / 穿越门控 / 待机提示 / 声音速度调制 */
     var spdN = clamp(st.speed / 0.22, 0, 1);           /* 归一化滚动速度 */

@@ -534,5 +534,6 @@ kbd{
 <script src="neon-video.js"></script>
 <script src="app.js"></script>
 <script>setTimeout(function(){var p=document.getElementById('preloader');if(p)p.classList.add('done')},8000)</script>
+<script>if(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)||innerWidth<768){setTimeout(function(){var p=document.getElementById('preloader');if(p)p.classList.add('done');var l=document.getElementById('loading');if(l)l.style.display='none'},1500)}</script>
 </body>
 </html>
