@@ -289,7 +289,7 @@
     if (!posterEl || !window.__isMobileSite) return;
 
     /* 漫游中：隐藏海报（视频正在播） */
-    if (typeof BIOVID !== 'undefined' && BIOVID && BIOVID.evTourActive && BIOVID.evTourActive()) {
+    if (typeof window.BIOVID !== 'undefined' && window.BIOVID && window.BIOVID.evTourActive && window.BIOVID.evTourActive()) {
       posterEl.style.opacity = 0;
       return;
     }
@@ -514,7 +514,8 @@
   window.scrollTo(0, 0);
   measure();
   if (rm) document.body.classList.add('reduced');
-  if (Vid) Vid.init({ reduced: rm,
+  if (Vid) Vid.init({
+      onTourProgress: function(mtP) { if (mtP !== undefined) window.scrollTo(0, mtP * (document.documentElement.scrollHeight - innerHeight)); }, reduced: rm,
     onTourDone: function () { if (tour.on) stopTour(); },
     onTourBreak: function () { tour.videoPaced = false; tour.startT = clamp(curP, 0, 0.999); tour.elapsed = 0; tour.dur = Math.max(6, (1 - tour.startT) * TOUR_FULL_SEC) * 1000; } });        /* reduced：模块禁用，静态模式用海报 */
   setTourBtn();

@@ -353,6 +353,8 @@
   #preloader .pl-sub{font-family:var(--mono,monospace);font-size:9px;letter-spacing:.3em;color:rgba(255,255,255,.3);animation:pl-sub-pulse 2s ease-in-out infinite}
   @keyframes pl-sub-pulse{0%,100%{opacity:.2}50%{opacity:.6}}
   @media(prefers-reduced-motion:reduce){#preloader .pl-anim,#preloader .pl-sub{animation:none}}
+
+  @media(min-width:769px){#mtv{display:none!important}}
 </style>
 </head>
 <body data-chapter="1">
@@ -368,6 +370,8 @@
   <!-- 画面主体：两段全关键帧 scrub 视频，seg1 0–55%（approach→port）、seg2 55–100%（port→core），
        55% 接缝两段共享 port 构图、短暂交叠；scrub 恒 muted，漫游时 unmuted 连播。
        任一段失败 → 海报静态兜底。见 js/astra-video.js -->
+    <!-- 移动端漫游专用 video（桌面端隐藏） -->
+  <video id="mtv" muted playsinline preload="none" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .5s ease;z-index:2;pointer-events:none" aria-hidden="true"></video>
   <video id="vid1" muted playsinline preload="none" aria-hidden="true"></video>
   <video id="vid2" muted playsinline preload="none" aria-hidden="true"></video>
   <!-- 静态模式章节切换过场 -->
@@ -489,15 +493,17 @@
   #preloader .pl-sub{font-family:var(--mono,monospace);font-size:9px;letter-spacing:.3em;color:rgba(255,255,255,.3);animation:pl-sub-pulse 2s ease-in-out infinite}
   @keyframes pl-sub-pulse{0%,100%{opacity:.2}50%{opacity:.6}}
   @media(prefers-reduced-motion:reduce){#preloader .pl-anim,#preloader .pl-sub{animation:none}}
+
+  @media(min-width:769px){#mtv{display:none!important}}
 </style>
   <div class="noscript">
     <p>本站由 JavaScript 与 Canvas 实时渲染驱动，请启用 JavaScript 后访问。<br>ASTRA · 深空信标计划</p>
   </div>
 </noscript>
 
-<script src="js/astra-audio.js"></script>
+<script src="js/astra-audio.js?v=3"></script>
 <script src="js/astra-hud.js"></script>
-<script src="js/astra-video.js"></script>
+<script src="js/astra-video.js?v=3"></script>
 <script src="js/astra-main.js"></script>
 <script>setTimeout(function(){var p=document.getElementById('preloader');if(p)p.classList.add('done')},8000)</script>
 <script>if(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)||innerWidth<768){setTimeout(function(){var p=document.getElementById('preloader');if(p)p.classList.add('done');var l=document.getElementById('loading');if(l)l.style.display='none'},1500)}</script>

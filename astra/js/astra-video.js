@@ -97,18 +97,43 @@
   var O = { revealMs: REVEAL_MS, timeoutMs: TIMEOUT_MS };
 
   function init(opts) {
-    /* MOBILE_SCRUB_OFF: 移动端禁用视频 scrub（iOS/Android 的 currentTime 快速 seek 机制性卡死）。
-     * 画面改由外壳的 mobileCamera() 海报+CSS 变换驱动。
-     * 漫游模式仍可用：tourStartEv() 单独启动视频正常播放（play，不 seek）。 */
+    /* MOBILE_V3: 移动端禁用 scrub 架构，用极简漫游播放器替代。
+     * 手动滚动 → 海报+CSS相机（外壳驱动，本模块不参与）
+     * 自动漫游 → 独立的 video.src 直连播放（不走 Blob/fetch） */
     if (IS_MOBILE) {
       st.disabled = true;
+      st.mobileTour = { on: false, idx: 0, el: null };
       var _mp = document.getElementById('poster');
-      if (_mp) { _mp.style.opacity = 1; _mp.style.display = 'block'; _mp.src = _mp.src || ''; }
+      if (_mp) { _mp.style.opacity = 1; _mp.style.display = 'block'; }
       var _ml = document.getElementById('loading');
       if (_ml) _ml.style.display = 'none';
       var _pl = document.getElementById('preloader');
       if (_pl) _pl.classList.add('done');
       if (typeof window !== 'undefined') window.__isMobileSite = true;
+
+      /* 创建移动端漫游播放器：一个 video 元素，直接 src 播放 */
+      var mtv = document.getElementById('mtv');
+      st.mobileTour.el = mtv;
+
+      /* 结尾自动下一段 */
+      mtv.addEventListener('ended', function() {
+        var mt = st.mobileTour;
+        if (!mt.on) return;
+        mt.idx++;
+        if (mt.idx < SEGS_DEF.length) {
+          mt.el.src = SEGS_DEF[mt.idx].urls[SEGS_DEF[mt.idx].urls.length - 1];
+          mt.el.play().catch(function(){});
+          if (O.onTourProgress) O.onTourProgress((mt.idx + 0.01) / SEGS_DEF.length);
+        } else {
+          /* 全部播完 */
+          mt.on = false;
+          mt.el.style.opacity = 0;
+          var _poster = document.getElementById('poster');
+          if (_poster) _poster.style.opacity = 1;
+          if (O.onTourDone) O.onTourDone();
+        }
+      });
+
       return false;
     }
     opts = opts || {};
@@ -423,31 +448,24 @@
     }
   }
   function tourStartEv(fromP) {
-    /* 移动端漫游：跳过 scrub 禁用，直接正常播放（play，不 seek） */
-    if (IS_MOBILE) {
-      if (!segs) {
-        /* 延迟初始化：只建 DOM 引用，不做 Blob 加载 */
-        st.ready = true;
-        segs = [];
-        for (var mi = 0; mi < SEGS_DEF.length; mi++) {
-          (function(def) {
-            var el = document.getElementById(def.elId);
-            if (!el) return;
-            el.playsInline = true; el.muted = false;
-            el.setAttribute('playsinline', '');
-            el.src = def.urls[def.urls.length - 1];  /* 用最后一个 URL（原画质 mp4） */
-            el.style.display = 'none';
-            segs.push({ id: def.id, urls: def.urls, span: def.span, el: el, poster: def.poster,
-              status: 'idle', dur: 6.58, reveal: 1, revealed: true, want: null, a: 0, op: 0, primed: false });
-          })(SEGS_DEF[mi]);
-        }
-      }
-      evTour.on = true;
-      /* 直接播当前段 */
+    /* 移动端漫游：极简直连播放（不走 Blob/fetch/scrub） */
+    if (IS_MOBILE && st.mobileTour && st.mobileTour.el) {
+      var mt = st.mobileTour;
       var ci = logic.coveringSeg(clamp(fromP || 0, 0, 1));
-      evEngage(ci);
+      mt.idx = ci;
+      mt.on = true;
+      mt.el.src = SEGS_DEF[ci].urls[SEGS_DEF[ci].urls.length - 1]; /* 原画质 mp4 */
+      mt.el.style.setProperty('opacity', '1', 'important');
+      var _poster = document.getElementById('poster');
+      if (_poster) _poster.style.setProperty('opacity', '0', 'important');
+      mt.el.play().catch(function() {
+        /* 自动播放被拒 → 静音重试 */
+        mt.el.muted = true;
+        mt.el.play().catch(function() { mt.on = false; mt.el.style.opacity = 0; if (_poster) _poster.style.opacity = 1; });
+      });
       return true;
     }
+    
     if (!st.ready) return false;
     st.lastP = clamp(fromP || 0, 0, 1);
     evTour.on = true;
@@ -458,6 +476,16 @@
     return true;
   }
   function tourStopEv() {
+    if (IS_MOBILE && st.mobileTour) {
+      st.mobileTour.on = false;
+      if (st.mobileTour.el) {
+        st.mobileTour.el.pause();
+        st.mobileTour.el.style.opacity = 0;
+      }
+      var _poster = document.getElementById('poster');
+      if (_poster) _poster.style.opacity = 1;
+      return;
+    }
     evTour.on = false;
     evTour.xfade = null;
     for (var vi = 0; vi < segs.length; vi++) { try { segs[vi].el.volume = 1; } catch (e) {} }
@@ -523,7 +551,7 @@
     tourStartEv: tourStartEv,
     tourStopEv: tourStopEv,
     tourDisplayP: tourDisplayP,
-    evTourActive: function () { return evTour.on; },
+    evTourActive: function () { return IS_MOBILE ? (st.mobileTour && st.mobileTour.on) : evTour.on; },
     logic: logic,
     init: init,
     update: update,

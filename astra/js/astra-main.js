@@ -104,7 +104,7 @@
     if (!posterEl || !window.__isMobileSite) return;
 
     /* 漫游中：隐藏海报（视频正在播） */
-    if (typeof AstraVideo !== 'undefined' && AstraVideo && AstraVideo.evTourActive && AstraVideo.evTourActive()) {
+    if (typeof window.AstraVideo !== 'undefined' && window.AstraVideo && window.AstraVideo.evTourActive && window.AstraVideo.evTourActive()) {
       posterEl.style.opacity = 0;
       return;
     }
@@ -544,7 +544,8 @@
     /* 画面层：两段视频 scrub 覆盖 0–100%（js/astra-video.js）；
      * seg1 0–55%（approach→port）、seg2 55–100%（port→core，结尾停稳在尾帧）。
      * 海报 = 首屏第一印象 + 失败兜底 + 静态模式关键帧。 */
-    if (Vid) Vid.init({ reduced: st.reduced,
+    if (Vid) Vid.init({
+      onTourProgress: function(mtP) { if (mtP !== undefined) window.scrollTo(0, mtP * (document.documentElement.scrollHeight - innerHeight)); }, reduced: st.reduced,
       onTourDone: function () { if (st.tour.on) endTour(); },
       onTourBreak: function () { st.tour.videoPaced = false; st.tour.startT = clamp(st.current, 0, 0.999); st.tour.elapsed = 0; st.tour.dur = Math.max(6, (1 - st.tour.startT) * TOUR_FULL_SEC) * 1000; } });     /* reduced：模块禁用，静态模式用海报 */
     /* P1 反馈层初始化：HUD（reduced 标志决定穿越动效取舍）+ 声音系统状态回调。

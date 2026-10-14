@@ -411,6 +411,8 @@ kbd{
   #preloader .pl-sub{font-family:var(--mono,monospace);font-size:9px;letter-spacing:.3em;color:rgba(255,255,255,.3);animation:pl-sub-pulse 2s ease-in-out infinite}
   @keyframes pl-sub-pulse{0%,100%{opacity:.2}50%{opacity:.6}}
   @media(prefers-reduced-motion:reduce){#preloader .pl-anim,#preloader .pl-sub{animation:none}}
+
+  @media(min-width:769px){#mtv{display:none!important}}
 </style>
 </head>
 <body>
@@ -422,6 +424,8 @@ kbd{
      海报 = 首屏第一印象 / 失败兜底 / 静态模式关键帧；无 canvas、无程序渲染） -->
 <div id="stage" role="img" aria-label="蓝眼泪追光一夜：从黄昏的海边小镇，到夜幕下苏醒的荧光海，再潜入水下的星河">
   <img id="poster" src="assets/keys/k1.png" alt="" aria-hidden="true">
+    <!-- 移动端漫游专用 video（桌面端隐藏） -->
+  <video id="mtv" muted playsinline preload="none" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .5s ease;z-index:2;pointer-events:none" aria-hidden="true"></video>
   <video id="vid1" muted playsinline preload="none" aria-hidden="true"></video>
   <video id="vid2" muted playsinline preload="none" aria-hidden="true"></video>
   <video id="vid3" muted playsinline preload="none" aria-hidden="true"></video>
@@ -543,16 +547,18 @@ kbd{
   #preloader .pl-sub{font-family:var(--mono,monospace);font-size:9px;letter-spacing:.3em;color:rgba(255,255,255,.3);animation:pl-sub-pulse 2s ease-in-out infinite}
   @keyframes pl-sub-pulse{0%,100%{opacity:.2}50%{opacity:.6}}
   @media(prefers-reduced-motion:reduce){#preloader .pl-anim,#preloader .pl-sub{animation:none}}
+
+  @media(min-width:769px){#mtv{display:none!important}}
 </style>
   <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#03121f;color:#e8f5f1;z-index:99;text-align:center;padding:24px">
     本页面需要启用 JavaScript 才能呈现蓝眼泪的荧光海场景。
   </div>
 </noscript>
 
-<script src="audio.js"></script>
-<script src="feedback.js"></script>
-<script src="biolum-video.js"></script>
-<script src="app.js"></script>
+<script src="audio.js?v=3"></script>
+<script src="feedback.js?v=3"></script>
+<script src="biolum-video.js?v=3"></script>
+<script src="app.js?v=3"></script>
 <script>setTimeout(function(){var p=document.getElementById('preloader');if(p)p.classList.add('done')},8000)</script>
 <script>if(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)||innerWidth<768){setTimeout(function(){var p=document.getElementById('preloader');if(p)p.classList.add('done');var l=document.getElementById('loading');if(l)l.style.display='none'},1500)}</script>
 </body>
