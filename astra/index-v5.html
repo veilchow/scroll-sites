@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ASTRA · 深空信标计划</title>
+<meta name="description" content="一座沉默了一万年的信标站，今夜将要醒来。滚动即航行。">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#04060e;--ink:#e8ecf4;--mut:#5a6278;--accent:#7db8ff;
+  --mono:'SF Mono','Cascadia Code','Consolas',monospace;
+  --sans:'Inter','SF Pro Display','Segoe UI','PingFang SC','Noto Sans SC',system-ui,sans-serif;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--sans)}
+
+/* ===== 场景层 ===== */
+#stage{position:fixed;inset:0;overflow:hidden}
+#stage video,#stage .poster{
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;object-position:50% 50%;
+}
+.poster{transition:opacity .6s ease;z-index:1}
+#vprev{z-index:2;opacity:0;transition:opacity .5s ease}
+#vcurr{z-index:3;opacity:0;transition:opacity .5s ease}
+#vnext{z-index:1;opacity:0}
+.stage-fade{position:absolute;inset:0;background:var(--bg);z-index:5;opacity:0;pointer-events:none;transition:opacity .4s ease}
+.stage-fade.on{opacity:1}
+
+/* ===== 加载屏 ===== */
+#preloader{
+  position:fixed;inset:0;z-index:100;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;gap:18px;
+  background:var(--bg);transition:opacity .6s ease,visibility .6s;
+}
+#preloader.done{opacity:0;visibility:hidden;pointer-events:none}
+#preloader .pl-anim{width:48px;height:48px;position:relative}
+#preloader .pl-anim.star{}
+#preloader .pl-title{font-family:var(--mono);font-size:12px;letter-spacing:.5em;color:var(--accent);opacity:.8}
+#preloader .pl-sub{font-family:var(--mono);font-size:9px;letter-spacing:.3em;color:var(--mut);animation:pl-pulse 2s ease-in-out infinite}
+@keyframes pl-pulse{0%,100%{opacity:.2}50%{opacity:.6}}
+#preloader .pl-bar{width:180px;height:1px;background:rgba(255,255,255,.08);overflow:hidden}
+#preloader .pl-bar i{display:block;height:100%;width:0%;background:var(--accent);transition:width .3s ease}
+
+/* 星点脉冲（ASTRA） */
+.pl-anim.star::before,.pl-anim.star::after{content:'';position:absolute;left:50%;top:50%;width:3px;height:3px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);animation:pl-star 2s ease-in-out infinite}
+.pl-anim.star::after{animation-delay:1s}
+@keyframes pl-star{0%,100%{transform:translate(-50%,-50%) scale(0);opacity:0}50%{transform:translate(-50%,-50%) scale(3);opacity:1}}
+/* 荧光呼吸（BIOLUM） */
+.pl-anim.glow{width:52px;height:52px;border-radius:50%;background:radial-gradient(circle,var(--accent) 0%,transparent 70%);animation:pl-glow 2.4s ease-in-out infinite}
+@keyframes pl-glow{0%,100%{transform:scale(.6);opacity:.3}50%{transform:scale(1.2);opacity:1}}
+/* 雨丝（NEON） */
+.pl-anim.rain{width:2px;height:36px;background:linear-gradient(180deg,transparent,var(--accent));animation:pl-rain 1.2s ease-in infinite;border-radius:2px}
+@keyframes pl-rain{0%{transform:translateY(-20px);opacity:0}30%{opacity:1}100%{transform:translateY(24px);opacity:0}}
+
+/* ===== HUD ===== */
+#hud{
+  position:fixed;left:clamp(14px,4vw,32px);bottom:clamp(14px,4vh,32px);z-index:20;
+  font-family:var(--mono);pointer-events:none;
+  transition:opacity .3s ease;
+}
+#hud .hud-cap{font-size:9px;letter-spacing:.4em;color:var(--mut);margin-bottom:4px}
+#hud .hud-big{font-size:clamp(28px,6vw,48px);font-weight:600;color:var(--ink);line-height:1;font-variant-numeric:tabular-nums}
+#hud .hud-unit{font-size:12px;color:var(--mut);margin-left:4px}
+#hud .hud-sub{font-size:10px;color:var(--mut);margin-top:6px;letter-spacing:.1em}
+#hud.hidden{opacity:0}
+
+/* ===== 顶部 ===== */
+#topbar{
+  position:fixed;top:0;left:0;right:0;z-index:20;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:clamp(14px,3vw,28px) clamp(18px,5vw,48px);
+}
+#brand{font-family:var(--mono);font-size:11px;letter-spacing:.4em;color:var(--ink);opacity:.8}
+#brand span{color:var(--mut);font-size:9px;margin-left:8px;letter-spacing:.3em}
+#nav{display:flex;gap:clamp(10px,2vw,24px)}
+#nav button{
+  background:none;border:none;cursor:pointer;font-family:var(--mono);
+  font-size:10px;letter-spacing:.2em;color:var(--mut);padding:6px 2px;
+  border-bottom:1px solid transparent;transition:color .3s,border-color .3s;
+}
+#nav button.active{color:var(--ink);border-bottom-color:var(--accent)}
+
+/* ===== 进度 ===== */
+#rail{
+  position:fixed;right:clamp(14px,3vw,24px);top:50%;transform:translateY(-50%);z-index:20;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+}
+#rail .track{width:1px;height:30vh;background:rgba(255,255,255,.08);position:relative}
+#rail .fill{width:100%;height:0%;background:var(--accent);transition:height .3s ease;position:absolute;top:0}
+#rail .pct{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--mut);writing-mode:vertical-rl}
+
+/* ===== 底部提示 ===== */
+#hint{
+  position:fixed;bottom:clamp(20px,5vh,40px);left:50%;transform:translateX(-50%);z-index:20;
+  font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--mut);
+  animation:hint-pulse 3s ease-in-out infinite;transition:opacity .5s;
+}
+#hint.gone{opacity:0}
+@keyframes hint-pulse{0%,100%{opacity:.3}50%{opacity:.8}}
+
+/* ===== 漫游按钮 ===== */
+#tour-btn{
+  position:fixed;right:clamp(14px,3vw,24px);bottom:clamp(14px,4vh,32px);z-index:20;
+  background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:999px;
+  color:var(--ink);font-family:var(--mono);font-size:10px;letter-spacing:.2em;
+  padding:10px 18px;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  transition:border-color .3s;
+}
+#tour-btn:hover{border-color:var(--accent)}
+
+/* ===== 章节标题 ===== */
+#chapter-title{
+  position:fixed;left:clamp(20px,6vw,80px);top:20vh;z-index:15;pointer-events:none;
+  transition:opacity .6s ease,transform .6s ease;
+}
+#chapter-title .t-kicker{font-family:var(--mono);font-size:9px;letter-spacing:.5em;color:var(--accent);margin-bottom:12px}
+#chapter-title .t-main{font-size:clamp(22px,4.5vw,48px);font-weight:600;line-height:1.3;text-shadow:0 2px 30px rgba(0,0,0,.6)}
+#chapter-title .t-sub{font-size:clamp(11px,1.2vw,14px);color:var(--mut);margin-top:10px;line-height:1.8;max-width:40ch}
+#chapter-title.fade-out{opacity:0;transform:translateY(-14px)}
+#chapter-title.fade-in{opacity:1;transform:translateY(0)}
+
+/* ===== 窄屏 ===== */
+@media(max-width:768px){
+  #chapter-title{left:5vw;top:15vh}
+  #chapter-title .t-main{font-size:clamp(20px,6vw,32px)}
+  #chapter-title .t-sub{font-size:12px}
+  #hud{left:14px;bottom:14px}
+  #hud .hud-big{font-size:clamp(22px,8vw,32px)}
+  #rail{right:10px}
+  #hint{bottom:70px}
+  #tour-btn{right:10px;bottom:60px}
+  #nav button{font-size:9px;padding:4px}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<div id="preloader">
+  <div class="pl-anim star"></div>
+  <div class="pl-title">ASTRA</div>
+  <div class="pl-sub">DEEP SPACE LINK</div>
+  <div class="pl-bar"><i id="pl-fill"></i></div>
+</div>
+
+<div id="stage">
+  <img class="poster" id="poster" src="assets/approach.png" alt="" aria-hidden="true">
+  <video id="vprev" muted playsinline preload="none"></video>
+  <video id="vcurr" muted playsinline preload="auto"></video>
+  <video id="vnext" muted playsinline preload="none"></video>
+  <div class="stage-fade" id="fade"></div>
+</div>
+
+<header id="topbar" class="ui">
+  <div id="brand">ASTRA<span>深空信标计划</span></div>
+  <nav id="nav"></nav>
+</header>
+
+<div id="chapter-title"></div>
+<div id="hud"></div>
+<div id="rail"><div class="track"><div class="fill" id="rail-fill"></div></div><div class="pct" id="pct">000</div></div>
+<div id="hint">滚动 · 接近下一程</div>
+<button id="tour-btn" type="button">▶ 自动漫游</button>
+
+<script>
+/* ================================================================
+   V5 简洁引擎：章节制滚动叙事
+   核心交互：滚动/滑动 = 跳转章节；视频正常播放（不 seek）
+   预加载：当前段播放时加载下一段
+   ================================================================ */
+(function() {
+'use strict';
+
+var CONFIG = {
+  "chapters": [
+    {
+      "nav": "接近",
+      "kicker": "CHAPTER 01 · APPROACH",
+      "title": "出发，去寂静深处。",
+      "sub": "滚动即航行——每一次滚动都向信标站逼近一程。",
+      "poster": "assets/approach.png",
+      "video": "assets/seg1-scrub.mp4",
+      "hud": {
+        "label": "RANGE TO PORT",
+        "start": 120.0,
+        "end": 0.8,
+        "unit": "km",
+        "sub": "接近速度 102 m/s"
+      }
+    },
+    {
+      "nav": "对接",
+      "kicker": "CHAPTER 02 · RENDEZVOUS",
+      "title": "灯塔仍在，等一位访客。",
+      "sub": "轨道修正，对接环解锁，港灯为你亮起。",
+      "poster": "assets/port.png",
+      "video": "assets/seg2-scrub.mp4",
+      "hud": {
+        "label": "CABIN PRESSURE",
+        "start": 0,
+        "end": 101,
+        "unit": "kPa",
+        "sub": "DOCKING"
+      }
+    },
+    {
+      "nav": "点亮",
+      "kicker": "CHAPTER 03 · IGNITION",
+      "title": "点亮它，回应一万光年。",
+      "sub": "晶体逐环亮起——请回应来自星海彼岸的呼叫。",
+      "poster": "assets/core.png",
+      "video": "assets/seg2-scrub.mp4",
+      "hud": {
+        "label": "SYNC RATE",
+        "start": 0,
+        "end": 100,
+        "unit": "%",
+        "sub": "信标重启中"
+      }
+    }
+  ],
+  "titleDuration": 5000
+};
+
+var doc = document, win = window;
+var st = {
+  chapter: 0,           // 当前章节
+  playing: false,        // 当前视频是否在播
+  touring: false,        // 自动漫游中
+  transitioning: false,  // 章节切换中
+  hintGone: false,
+};
+
+/* ---------- DOM ---------- */
+var poster = doc.getElementById('poster');
+var vprev = doc.getElementById('vprev');
+var vcurr = doc.getElementById('vcurr');
+var vnext = doc.getElementById('vnext');
+var fadeEl = doc.getElementById('fade');
+var preloader = doc.getElementById('preloader');
+var plFill = doc.getElementById('pl-fill');
+var hintEl = doc.getElementById('hint');
+var tourBtn = doc.getElementById('tour-btn');
+var titleEl = doc.getElementById('chapter-title');
+var hudEl = doc.getElementById('hud');
+var railFill = doc.getElementById('rail-fill');
+var pctEl = doc.getElementById('pct');
+var navEl = doc.getElementById('nav');
+
+/* ---------- 章节导航 ---------- */
+for (var ni = 0; ni < CONFIG.chapters.length; ni++) {
+  (function(i) {
+    var btn = doc.createElement('button');
+    btn.textContent = CONFIG.chapters[i].nav;
+    btn.addEventListener('click', function() { goTo(i); });
+    navEl.appendChild(btn);
+  })(ni);
+}
+var navBtns = Array.prototype.slice.call(navEl.children);
+
+/* ---------- 视频 ---------- */
+function videoFor(chIdx) { return chIdx === st.chapter ? vcurr : (chIdx === st.chapter - 1 ? vprev : vnext); }
+
+function loadVideo(el, src, onProgress) {
+  return new Promise(function(resolve, reject) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', src, true);
+    xhr.responseType = 'blob';
+    xhr.onprogress = function(e) {
+      if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
+    };
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        el.src = URL.createObjectURL(xhr.response);
+        el.load();
+        el.addEventListener('canplaythrough', function h() {
+          el.removeEventListener('canplaythrough', h);
+          resolve();
+        }, { once: true });
+        // 兜底：3 秒后即使未 canplaythrough 也 resolve
+        setTimeout(resolve, 3000);
+      } else reject();
+    };
+    xhr.onerror = reject;
+    xhr.send();
+  });
+}
+
+/* ---------- 章节切换 ---------- */
+function goTo(idx) {
+  if (st.transitioning || idx < 0 || idx >= CONFIG.chapters.length || idx === st.chapter) return;
+  userInterrupt();
+  st.transitioning = true;
+  var ch = CONFIG.chapters[idx];
+  var prevIdx = st.chapter;
+  st.chapter = idx;
+
+  /* 视觉切换：fade out → 换源 → fade in */
+  fadeEl.classList.add('on');
+
+  setTimeout(function() {
+    /* 更新海报兜底 */
+    poster.src = ch.poster;
+    poster.style.opacity = 0;  // 视频播时隐藏
+
+    /* 更新标题 */
+    showTitle(idx);
+
+    /* 更新 HUD */
+    updateHUD(idx, 0);
+
+    /* 更新导航 */
+    navBtns.forEach(function(b, i) { b.classList.toggle('active', i === idx); });
+
+    /* 加载并播放视频 */
+    var target = (idx > prevIdx) ? vnext : vprev;  // 方向决定用哪个 video 元素
+    target.src = ch.video;
+    target.style.opacity = 1;
+    target.currentTime = 0;
+    target.muted = false;
+    target.play().then(function() {
+      /* 播放成功 */
+      fadeEl.classList.remove('on');
+      st.transitioning = false;
+      st.playing = true;
+
+      /* 预加载下一段 */
+      preloadNext(idx);
+
+      /* 结尾自动待机（非漫游时停在最后帧） */
+      target.onended = function() {
+        st.playing = false;
+        if (st.touring) {
+          /* 漫游模式：自动进下一段 */
+          if (idx + 1 < CONFIG.chapters.length) {
+            goTo(idx + 1);
+          } else {
+            stopTour();
+          }
+        }
+        /* 非漫游：停在最后帧等待下一次输入 */
+      };
+    }).catch(function() {
+      /* 自动播放被拒：静音重试 */
+      target.muted = true;
+      target.play().then(function() {
+        fadeEl.classList.remove('on');
+        st.transitioning = false;
+        st.playing = true;
+        preloadNext(idx);
+      }).catch(function() {
+        /* 彻底失败：显示海报 */
+        poster.style.opacity = 1;
+        fadeEl.classList.remove('on');
+        st.transitioning = false;
+      });
+    });
+
+    /* 隐藏旧视频 */
+    var old = (idx > prevIdx) ? vprev : vnext;
+    old.style.opacity = 0;
+    old.pause();
+  }, 400);
+}
+
+/* ---------- 预加载下一段 ---------- */
+function preloadNext(idx) {
+  var next = idx + 1;
+  if (next >= CONFIG.chapters.length) return;
+  var el = vnext;
+  if (el.src !== CONFIG.chapters[next].video && !el.src.includes(CONFIG.chapters[next].video.split('/').pop())) {
+    el.src = CONFIG.chapters[next].video;
+    el.preload = 'auto';
+    el.load();
+  }
+}
+
+/* ---------- 标题 ---------- */
+function showTitle(idx) {
+  var ch = CONFIG.chapters[idx];
+  titleEl.innerHTML = '<div class="t-kicker">' + ch.kicker + '</div>' +
+    '<div class="t-main">' + ch.title + '</div>' +
+    (ch.sub ? '<div class="t-sub">' + ch.sub + '</div>' : '');
+  titleEl.className = 'fade-in';
+  clearTimeout(showTitle._t);
+  showTitle._t = setTimeout(function() {
+    titleEl.className = 'fade-out';
+  }, CONFIG.titleDuration || 4000);
+}
+
+/* ---------- HUD ---------- */
+function updateHUD(idx, progress) {
+  var ch = CONFIG.chapters[idx];
+  if (!ch.hud) return;
+  var val = ch.hud.start + (ch.hud.end - ch.hud.start) * progress;
+  hudEl.innerHTML = '<div class="hud-cap">' + ch.hud.label + '</div>' +
+    '<div><span class="hud-big">' + val.toFixed(1) + '</span><span class="hud-unit">' + ch.hud.unit + '</span></div>' +
+    (ch.hud.sub ? '<div class="hud-sub">' + ch.hud.sub + '</div>' : '');
+}
+
+/* ---------- 进度条 ---------- */
+function updateRail() {
+  var chProgress = st.playing ? (vcurr.currentTime / (vcurr.duration || 6)) : 0;
+  var total = (st.chapter + chProgress) / CONFIG.chapters.length;
+  var pct = Math.round(total * 100);
+  railFill.style.height = pct + '%';
+  pctEl.textContent = (pct < 10 ? '00' : pct < 100 ? '0' : '') + pct;
+}
+
+/* ---------- 漫游 ---------- */
+function startTour() {
+  if (st.touring) { stopTour(); return; }
+  st.touring = true;
+  tourBtn.textContent = '❚❚ 暂停漫游';
+  dismissHint();
+  if (st.chapter === 0 && !st.playing) {
+    goTo(0);  // 从头开始（goTo 会跳过相同章节，所以特殊处理第一章）
+    playCurrent();
+  }
+  // goTo 内的 onended 会自动链到下一段
+}
+function stopTour() {
+  st.touring = false;
+  tourBtn.textContent = '▶ 自动漫游';
+}
+function playCurrent() {
+  vcurr.muted = false;
+  vcurr.play().catch(function() { vcurr.muted = true; vcurr.play().catch(function(){}); });
+  st.playing = true;
+  vcurr.onended = function() {
+    st.playing = false;
+    if (st.touring) {
+      if (st.chapter + 1 < CONFIG.chapters.length) goTo(st.chapter + 1);
+      else stopTour();
+    }
+  };
+}
+
+/* ---------- 输入处理 ---------- */
+var wheelAccum = 0, wheelTimer = 0;
+win.addEventListener('wheel', function(e) {
+  e.preventDefault();
+  userInterrupt();
+  wheelAccum += e.deltaY;
+  clearTimeout(wheelTimer);
+  wheelTimer = setTimeout(function() { wheelAccum = 0; }, 200);
+  if (Math.abs(wheelAccum) > 60) {
+    var dir = wheelAccum > 0 ? 1 : -1;
+    wheelAccum = 0;
+    goTo(st.chapter + dir);
+  }
+}, { passive: false });
+
+/* 触摸滑动 */
+var touchY = 0, touchTime = 0;
+win.addEventListener('touchstart', function(e) {
+  touchY = e.touches[0].clientY;
+  touchTime = Date.now();
+  userInterrupt();
+}, { passive: true });
+win.addEventListener('touchend', function(e) {
+  var dy = touchY - e.changedTouches[0].clientY;
+  var dt = Date.now() - touchTime;
+  if (Math.abs(dy) > 40 && dt < 500) {
+    goTo(st.chapter + (dy > 0 ? 1 : -1));
+  }
+}, { passive: true });
+
+/* 键盘 */
+win.addEventListener('keydown', function(e) {
+  if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); userInterrupt(); goTo(st.chapter + 1); }
+  else if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); userInterrupt(); goTo(st.chapter - 1); }
+  else if (e.key === ' ') { e.preventDefault(); startTour(); }
+  else if (e.key === 'h' || e.key === 'H' || e.key === 'Escape') {
+    doc.querySelectorAll('.ui, #hud, #rail, #hint, #tour-btn, #chapter-title').forEach(function(el) {
+      el.style.visibility = el.style.visibility === 'hidden' ? '' : 'hidden';
+    });
+  }
+});
+
+function userInterrupt() {
+  if (st.touring) stopTour();
+  dismissHint();
+}
+function dismissHint() {
+  if (st.hintGone) return;
+  st.hintGone = true;
+  hintEl.classList.add('gone');
+}
+
+tourBtn.addEventListener('click', function() { tourBtn.blur(); startTour(); });
+
+/* ---------- 主循环（轻量：只更新 HUD 和进度条） ---------- */
+var rafId = 0, running = true;
+function frame() {
+  if (!running) return;
+  rafId = requestAnimationFrame(frame);
+  if (st.playing && vcurr.duration > 0) {
+    var chProgress = vcurr.currentTime / vcurr.duration;
+    updateHUD(st.chapter, chProgress);
+  }
+  updateRail();
+}
+frame();
+doc.addEventListener('visibilitychange', function() {
+  if (doc.hidden) { running = false; cancelAnimationFrame(rafId); }
+  else if (!running) { running = true; frame(); }
+});
+
+/* ---------- 初始化 ---------- */
+function init() {
+  /* 加载第一段视频（带进度） */
+  var ch1 = CONFIG.chapters[0];
+  loadVideo(vcurr, ch1.video, function(p) {
+    plFill.style.width = Math.round(p * 100) + '%';
+  }).then(function() {
+    preloader.classList.add('done');
+    poster.src = ch1.poster;
+    showTitle(0);
+    updateHUD(0, 0);
+    navBtns[0].classList.add('active');
+
+    /* 预加载第二段 */
+    if (CONFIG.chapters[1]) {
+      vnext.src = CONFIG.chapters[1].video;
+      vnext.preload = 'auto';
+      vnext.load();
+    }
+
+    /* 自动开始播放第一段 */
+    playCurrent();
+    vcurr.style.opacity = 1;
+  }).catch(function() {
+    /* 加载失败：显示海报，等待用户交互 */
+    preloader.classList.add('done');
+    poster.style.opacity = 1;
+    showTitle(0);
+    navBtns[0].classList.add('active');
+  });
+}
+init();
+
+})();
+</script>
+</body>
+</html>
