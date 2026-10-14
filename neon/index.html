@@ -2,544 +2,548 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#04030c">
-<meta name="description" content="NEON DRIFT 雨夜漫游 —— 滚动驱动的叙事网站：镜头穿云俯冲落向雨夜街面，再沉入地下市场的心跳。">
-<link rel="icon" href="data:,">
-<link rel="preload" as="image" href="assets/keys2/k1.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NEON DRIFT · 雨夜漫游</title>
+<meta name="description" content="这场雨从四百米高空落进城市心底。滚动即下落。">
 <style>
+*{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --mag:#ff2d95;
-  --cyn:#26e6ff;
-  --pur:#8b5cf6;
-  --warm:#ffb454;
-  --ink:#e9e6f7;
-  --dim:rgba(233,230,247,.55);
+  --bg:#0a0618;--ink:#e8ecf4;--mut:#5a6278;--accent:#ff5fa8;
+  --mono:'SF Mono','Cascadia Code','Consolas',monospace;
+  --sans:'Inter','SF Pro Display','Segoe UI','PingFang SC','Noto Sans SC',system-ui,sans-serif;
 }
-*{box-sizing:border-box}
-html{scroll-behavior:auto}
-body{
-  margin:0;
-  background:#04030c;
-  color:var(--ink);
-  font-family:"Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans SC",system-ui,sans-serif;
-  overflow-x:hidden;
-}
-::selection{background:rgba(255,45,149,.4)}
-::-webkit-scrollbar{width:10px;height:10px}
-::-webkit-scrollbar-track{background:#070512}
-::-webkit-scrollbar-thumb{background:#2a1a52;border-radius:6px;border:2px solid #070512}
-::-webkit-scrollbar-thumb:hover{background:#43307a}
-html{scrollbar-color:#2a1a52 #070512;scrollbar-width:thin}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--sans)}
 
-/* 滚动轨道：撑出约 7 屏的滚动距离（总高 8 屏视口） */
-#spacer{height:800vh;height:800svh}
-
-/* ===== 场景层：固定铺满视口（v3：视频 = 画面唯一来源，无 canvas） ===== */
-#stage{
-  position:fixed;
-  left:0;right:0;top:0;
-  width:100vw;
-  height:100vh;
-  height:100svh;
-  overflow:hidden;
-  background:#04030c;
-  isolation:isolate;
-  z-index:0;
-}
-/* 底层海报：首屏第一印象（视频就绪前）+ 加载失败静态兜底 + reduced-motion 静态模式关键帧 */
-#poster{
+/* ===== 场景层 ===== */
+#stage{position:fixed;inset:0;overflow:hidden}
+#stage video,#stage .poster{
   position:absolute;inset:0;width:100%;height:100%;
-  object-fit:cover;object-position:50% 50%;display:block;z-index:1;
+  object-fit:cover;object-position:50% 50%;
 }
-/* 画面主体：三段全关键帧 scrub 视频（neon-video.js）
-   seg1 0–33%（k1→k2 穿云俯冲）、seg2 33–66%（k2→k3 沉降街面）、
-   seg3 66–100%（k3→k4 入地）。33%/66% 接缝相邻段共享构图关键帧、
-   短暂交叠交叉淡化（权重互补和恒 1）；scrub 恒 muted，漫游时 unmuted 三段连播。
-   任一段失败 → 海报静态兜底（按覆盖段切 k1/k2/k4）。 */
-#stage video{
-  position:absolute;inset:0;width:100%;height:100%;
-  object-fit:cover;object-position:50% 50%;z-index:2;
-  opacity:0;pointer-events:none;background:transparent;
-}
-/* 静态模式章节切换过场 */
-#fade{
-  position:absolute;inset:0;z-index:5;background:#04030c;opacity:0;
-  transition:opacity .34s ease;pointer-events:none;
-}
-#fade.on{opacity:1}
-/* 加载指示：流式装载百分比（neon-video.js 写 data-pct），首段显影后 .done 淡出 */
-#loading{
-  position:absolute;left:50%;bottom:18vh;transform:translateX(-50%);z-index:8;
-  font-family:var(--mono,monospace);font-size:10px;letter-spacing:.3em;
-  color:var(--dim);opacity:.9;transition:opacity .8s ease;pointer-events:none;
-}
-#loading::before{content:'LOADING ' attr(data-pct);content:'信号同步中 · ' attr(data-pct);}
-#loading.done{opacity:0;}
+.poster{transition:opacity .6s ease;z-index:1}
+#vprev{z-index:2;opacity:0;transition:opacity .5s ease}
+#vcurr{z-index:3;opacity:0;transition:opacity .5s ease}
+#vnext{z-index:1;opacity:0}
+.stage-fade{position:absolute;inset:0;background:var(--bg);z-index:5;opacity:0;pointer-events:none;transition:opacity .4s ease}
+.stage-fade.on{opacity:1}
 
-/* ===== UI ===== */
-.ui{position:fixed;z-index:20;transition:opacity .4s ease}
-body.ui-hidden .ui{opacity:0!important;pointer-events:none!important}
+/* ===== 加载屏 ===== */
+#preloader{
+  position:fixed;inset:0;z-index:100;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;gap:18px;
+  background:var(--bg);transition:opacity .6s ease,visibility .6s;
+}
+#preloader.done{opacity:0;visibility:hidden;pointer-events:none}
+#preloader .pl-anim{width:48px;height:48px;position:relative}
+#preloader .pl-anim.rain{}
+#preloader .pl-title{font-family:var(--mono);font-size:12px;letter-spacing:.5em;color:var(--accent);opacity:.8}
+#preloader .pl-sub{font-family:var(--mono);font-size:9px;letter-spacing:.3em;color:var(--mut);animation:pl-pulse 2s ease-in-out infinite}
+@keyframes pl-pulse{0%,100%{opacity:.2}50%{opacity:.6}}
+#preloader .pl-bar{width:180px;height:1px;background:rgba(255,255,255,.08);overflow:hidden}
+#preloader .pl-bar i{display:block;height:100%;width:0%;background:var(--accent);transition:width .3s ease}
 
+/* 星点脉冲（ASTRA） */
+.pl-anim.star::before,.pl-anim.star::after{content:'';position:absolute;left:50%;top:50%;width:3px;height:3px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);animation:pl-star 2s ease-in-out infinite}
+.pl-anim.star::after{animation-delay:1s}
+@keyframes pl-star{0%,100%{transform:translate(-50%,-50%) scale(0);opacity:0}50%{transform:translate(-50%,-50%) scale(3);opacity:1}}
+/* 荧光呼吸（BIOLUM） */
+.pl-anim.glow{width:52px;height:52px;border-radius:50%;background:radial-gradient(circle,var(--accent) 0%,transparent 70%);animation:pl-glow 2.4s ease-in-out infinite}
+@keyframes pl-glow{0%,100%{transform:scale(.6);opacity:.3}50%{transform:scale(1.2);opacity:1}}
+/* 雨丝（NEON） */
+.pl-anim.rain{width:2px;height:36px;background:linear-gradient(180deg,transparent,var(--accent));animation:pl-rain 1.2s ease-in infinite;border-radius:2px}
+@keyframes pl-rain{0%{transform:translateY(-20px);opacity:0}30%{opacity:1}100%{transform:translateY(24px);opacity:0}}
+
+/* ===== HUD ===== */
+#hud{
+  position:fixed;left:clamp(14px,4vw,32px);bottom:clamp(14px,4vh,32px);z-index:20;
+  font-family:var(--mono);pointer-events:none;
+  transition:opacity .3s ease;
+}
+#hud .hud-cap{font-size:9px;letter-spacing:.4em;color:var(--mut);margin-bottom:4px}
+#hud .hud-big{font-size:clamp(28px,6vw,48px);font-weight:600;color:var(--ink);line-height:1;font-variant-numeric:tabular-nums}
+#hud .hud-unit{font-size:12px;color:var(--mut);margin-left:4px}
+#hud .hud-sub{font-size:10px;color:var(--mut);margin-top:6px;letter-spacing:.1em}
+#hud.hidden{opacity:0}
+
+/* ===== 顶部 ===== */
 #topbar{
-  top:0;left:0;right:0;
-  display:flex;align-items:center;justify-content:space-between;gap:12px;
-  padding:16px clamp(16px,3vw,36px);
-  background:linear-gradient(rgba(4,3,14,.72),rgba(4,3,14,0));
-  flex-wrap:wrap;
+  position:fixed;top:0;left:0;right:0;z-index:20;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:clamp(14px,3vw,28px) clamp(18px,5vw,48px);
 }
-.brand{display:flex;flex-direction:column;line-height:1.15;user-select:none}
-.brand b{
-  font-size:15px;font-weight:800;letter-spacing:.42em;color:#fff;
-  text-shadow:0 0 8px rgba(38,230,255,.8),0 0 22px rgba(255,45,149,.55);
+#brand{font-family:var(--mono);font-size:11px;letter-spacing:.4em;color:var(--ink);opacity:.8}
+#brand span{color:var(--mut);font-size:9px;margin-left:8px;letter-spacing:.3em}
+#nav{display:flex;gap:clamp(10px,2vw,24px)}
+#nav button{
+  background:none;border:none;cursor:pointer;font-family:var(--mono);
+  font-size:10px;letter-spacing:.2em;color:var(--mut);padding:6px 2px;
+  border-bottom:1px solid transparent;transition:color .3s,border-color .3s;
 }
-.brand span{font-size:11px;letter-spacing:.55em;color:var(--dim);margin-top:3px}
-#topbar nav{display:flex;align-items:center;gap:2px;flex-wrap:wrap}
-.nav-btn{
-  background:none;border:0;color:var(--dim);font:inherit;font-size:13px;
-  letter-spacing:.28em;padding:8px 12px;cursor:pointer;position:relative;
-  transition:color .25s,text-shadow .25s;
-}
-.nav-btn::after{
-  content:"";position:absolute;left:12px;right:12px;bottom:2px;height:1px;
-  background:linear-gradient(90deg,var(--cyn),var(--mag));
-  transform:scaleX(0);transform-origin:left;
-  transition:transform .3s;box-shadow:0 0 8px var(--cyn);
-}
-.nav-btn:hover{color:#fff}
-.nav-btn.active{color:#fff;text-shadow:0 0 10px rgba(38,230,255,.9)}
-.nav-btn.active::after{transform:scaleX(1)}
-#tour-btn{
-  margin-left:14px;background:rgba(12,8,30,.55);border:1px solid rgba(139,92,246,.55);
-  color:var(--ink);border-radius:999px;padding:8px 16px;font:inherit;font-size:12px;
-  letter-spacing:.2em;cursor:pointer;transition:border-color .25s,box-shadow .25s;
-  backdrop-filter:blur(4px);
-}
-#tour-btn:hover{border-color:var(--cyn);box-shadow:0 0 14px rgba(38,230,255,.35)}
-#tour-btn.disabled{opacity:.45;cursor:not-allowed}
+#nav button.active{color:var(--ink);border-bottom-color:var(--accent)}
 
-/* 左侧大标题（网格堆叠 + JS 淡入淡出；RM 静态模式用 .active 淡切） */
-#titles{
-  left:clamp(16px,5vw,84px);top:0;bottom:0;
-  width:min(46vw,620px);
-  display:grid;align-content:center;
-  pointer-events:none;
-}
-.ch-title{
-  grid-area:1/1;
-  display:flex;flex-direction:column;justify-content:center;gap:14px;
-  opacity:0;transform:translateY(26px);
-}
-body.reduced .ch-title{transition:opacity .3s ease}
-body.reduced .ch-title.active{opacity:1;transform:none}
-.ch-num{
-  font-size:12px;letter-spacing:.5em;color:var(--cyn);
-  text-shadow:0 0 10px rgba(38,230,255,.7);
-}
-.ch-line{
-  margin:0;font-size:clamp(26px,3.6vw,54px);font-weight:800;line-height:1.28;color:#f4f1ff;
-  text-shadow:0 0 14px rgba(255,45,149,.45),0 2px 30px rgba(10,4,30,.9);
-}
-.ch-sub{font-size:11px;letter-spacing:.4em;color:var(--dim)}
-/* 首屏 hero：品牌版式 + 双 CTA（仅第一章，0% 即完整可见，滚动后随节奏淡出） */
-.hero .ch-line{line-height:1.2;font-size:clamp(30px,4.8vw,60px)}
-.hero .ch-sub{letter-spacing:.1em;line-height:1.9;max-width:44ch;font-size:12px}
-  .hero-meta{
-    margin:22px 0 0;font-family:var(--mono,monospace);font-size:10px;letter-spacing:.22em;
-    color:var(--dim,var(--mut,#9aa3b8));padding-top:14px;
-    border-top:1px solid rgba(255,90,180,.16);max-width:44ch;
-  }
-
-/* 右侧探索进度条 0–100% */
+/* ===== 进度 ===== */
 #rail{
-  right:clamp(10px,2vw,26px);top:50%;transform:translateY(-50%);
+  position:fixed;right:clamp(14px,3vw,24px);top:50%;transform:translateY(-50%);z-index:20;
   display:flex;flex-direction:column;align-items:center;gap:8px;
 }
-#rail .cap{font-size:10px;letter-spacing:.18em;color:var(--dim);font-variant-numeric:tabular-nums}
-#rail .cap#pct{color:#fff;text-shadow:0 0 8px rgba(38,230,255,.8)}
-#rail .track{position:relative;width:2px;height:min(42vh,380px);background:rgba(233,230,247,.14);border-radius:2px;cursor:pointer}
-#rail-fill{
-  position:absolute;top:0;left:-1px;width:4px;height:0%;border-radius:2px;
-  background:linear-gradient(180deg,var(--cyn),var(--mag));
-  box-shadow:0 0 10px rgba(38,230,255,.8);
-}
-.tick{position:absolute;left:-3px;width:8px;height:1px;background:rgba(233,230,247,.35)}
+#rail .track{width:1px;height:30vh;background:rgba(255,255,255,.08);position:relative}
+#rail .fill{width:100%;height:0%;background:var(--accent);transition:height .3s ease;position:absolute;top:0}
+#rail .pct{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--mut);writing-mode:vertical-rl}
 
-/* 底部滚动提示（首次滚动后淡出） */
+/* ===== 底部提示 ===== */
 #hint{
-  bottom:clamp(18px,4vh,40px);left:50%;transform:translateX(-50%);
-  display:flex;flex-direction:column;align-items:center;gap:9px;
-  color:var(--dim);font-size:12px;letter-spacing:.32em;text-align:center;white-space:nowrap;
+  position:fixed;bottom:clamp(20px,5vh,40px);left:50%;transform:translateX(-50%);z-index:20;
+  font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--mut);
+  animation:hint-pulse 3s ease-in-out infinite;transition:opacity .5s;
 }
-#hint .chev{
-  width:10px;height:10px;border-right:2px solid var(--cyn);border-bottom:2px solid var(--cyn);
-  transform:rotate(45deg);animation:bob 1.6s ease-in-out infinite;
-  filter:drop-shadow(0 0 6px rgba(38,230,255,.8));
-}
-@keyframes bob{
-  0%,100%{transform:rotate(45deg) translate(0,0);opacity:.5}
-  50%{transform:rotate(45deg) translate(4px,4px);opacity:1}
-}
-#hint.hide{opacity:0;pointer-events:none}
+#hint.gone{opacity:0}
+@keyframes hint-pulse{0%,100%{opacity:.3}50%{opacity:.8}}
 
-/* 快捷键提示 */
-#keys{left:clamp(16px,3vw,36px);bottom:16px;font-size:10px;letter-spacing:.22em;color:rgba(233,230,247,.42)}
-kbd{
-  border:1px solid rgba(233,230,247,.25);border-radius:4px;padding:1px 5px;
-  font-family:inherit;font-size:10px;margin:0 2px;
+/* ===== 漫游按钮 ===== */
+#tour-btn{
+  position:fixed;right:clamp(14px,3vw,24px);bottom:clamp(14px,4vh,32px);z-index:20;
+  background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:999px;
+  color:var(--ink);font-family:var(--mono);font-size:10px;letter-spacing:.2em;
+  padding:10px 18px;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  transition:border-color .3s;
 }
+#tour-btn:hover{border-color:var(--accent)}
 
-/* ===== P1 反馈层：计量 HUD（左下，按章切换组件集） ===== */
-#hud{
-  left:clamp(16px,3vw,36px);bottom:52px;
-  min-width:212px;padding:10px 14px 11px;
-  background:linear-gradient(160deg,rgba(10,6,26,.74),rgba(6,4,18,.55));
-  border:1px solid rgba(38,230,255,.22);border-left:2px solid var(--cyn);
-  border-radius:8px;backdrop-filter:blur(6px);
-  font-variant-numeric:tabular-nums;
-  box-shadow:0 4px 26px rgba(2,1,10,.5),inset 0 0 18px rgba(38,230,255,.05);
+/* ===== 章节标题 ===== */
+#chapter-title{
+  position:fixed;left:clamp(20px,6vw,80px);top:20vh;z-index:15;pointer-events:none;
+  transition:opacity .6s ease,transform .6s ease;
 }
-.hud-ch{display:none}
-.hud-ch.active{display:block}
-.hud-ch.in{animation:hudIn .3s ease-out}
-@keyframes hudIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-.hud-ch.roll-out{animation:hudOut .24s ease-in forwards}   /* 穿越时刻：旧计量翻滚退场 */
-@keyframes hudOut{to{opacity:0;transform:translateY(16px);filter:blur(3px)}}
-.hud-label{font-size:10px;letter-spacing:.32em;color:rgba(38,230,255,.8);margin-bottom:5px}
-.hud-big{
-  font-family:"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
-  font-size:clamp(28px,5vw,56px);line-height:1.04;font-weight:700;color:#fff;
-  text-shadow:0 0 12px rgba(38,230,255,.65),0 0 30px rgba(255,45,149,.3);
-  transition:filter .15s,text-shadow .15s;
-}
-.hud-big .hud-unit{font-size:.38em;font-weight:600;color:var(--dim);margin-left:.18em;letter-spacing:.08em}
-.hud-sub{margin-top:7px;font-size:11px;letter-spacing:.14em;color:var(--dim);display:flex;align-items:center;gap:6px}
-.hud-sub b{color:#fff;font-family:"Cascadia Mono",Consolas,monospace;font-weight:700;font-size:13px}
-.hud-sub .vs{color:var(--cyn)}
-.hud-loc{
-  font-size:clamp(17px,2vw,22px);font-weight:700;color:#fff;letter-spacing:.06em;
-  text-shadow:0 0 10px rgba(255,45,149,.5);
-}
-.hud-loc b{
-  color:var(--cyn);font-family:"Cascadia Mono",Consolas,monospace;font-size:1.18em;
-  text-shadow:0 0 10px rgba(38,230,255,.85);transition:filter .15s;
-}
-/* 速度响应：快滚时数字加速感（轻模糊 + 辉光增强） */
-#hud.spd .hud-big,#hud.spd .hud-loc b{filter:blur(.5px);text-shadow:0 0 18px rgba(38,230,255,.95)}
-.hud-row{display:flex;align-items:center;gap:10px;margin-top:8px}
+#chapter-title .t-kicker{font-family:var(--mono);font-size:9px;letter-spacing:.5em;color:var(--accent);margin-bottom:12px}
+#chapter-title .t-main{font-size:clamp(22px,4.5vw,48px);font-weight:600;line-height:1.3;text-shadow:0 2px 30px rgba(0,0,0,.6)}
+#chapter-title .t-sub{font-size:clamp(11px,1.2vw,14px);color:var(--mut);margin-top:10px;line-height:1.8;max-width:40ch}
+#chapter-title.fade-out{opacity:0;transform:translateY(-14px)}
+#chapter-title.fade-in{opacity:1;transform:translateY(0)}
 
-/* 楼层翻牌 B1→B2（机械整牌翻转，铰线 + 回弹） */
-.flip{position:relative;display:inline-block;width:56px;height:38px;perspective:220px;flex:none}
-.flip-inner{
-  position:relative;display:block;width:100%;height:100%;
-  transform-style:preserve-3d;transition:transform .58s cubic-bezier(.5,.05,.3,1.18);
+/* ===== 窄屏 ===== */
+@media(max-width:768px){
+  #chapter-title{left:5vw;top:15vh}
+  #chapter-title .t-main{font-size:clamp(20px,6vw,32px)}
+  #chapter-title .t-sub{font-size:12px}
+  #hud{left:14px;bottom:14px}
+  #hud .hud-big{font-size:clamp(22px,8vw,32px)}
+  #rail{right:10px}
+  #hint{bottom:70px}
+  #tour-btn{right:10px;bottom:60px}
+  #nav button{font-size:9px;padding:4px}
 }
-.flip.b2 .flip-inner{transform:rotateX(-180deg)}
-.flip-face{
-  position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
-  display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(180deg,#141232,#0a0a1e);
-  border:1px solid rgba(38,230,255,.45);border-radius:5px;
-  font-weight:800;font-size:16px;letter-spacing:.04em;color:#fff;
-  font-family:"Cascadia Mono",Consolas,monospace;text-shadow:0 0 8px rgba(38,230,255,.8);
+@media(prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
 }
-.flip-face.back{transform:rotateX(180deg);border-color:rgba(255,180,84,.55);color:#ffd9a0;text-shadow:0 0 8px rgba(255,180,84,.8)}
-.flip::after{content:"";position:absolute;left:3px;right:3px;top:50%;height:1px;background:rgba(2,1,10,.8);z-index:2}
-.hud-temp{font-size:12px;letter-spacing:.1em;color:var(--dim)}
-
-/* 抵达：城市的心跳（SEG3 尾端亮起） */
-#hud-arrive{
-  margin-top:9px;font-size:13px;font-weight:700;letter-spacing:.22em;
-  color:rgba(255,180,84,.25);opacity:0;transition:opacity .8s;
-}
-#hud-arrive.lit{
-  opacity:1;color:#ffd9a0;
-  text-shadow:0 0 12px rgba(255,180,84,.9),0 0 34px rgba(255,120,60,.5);
-  animation:arriveGlow 2.4s ease-in-out infinite;
-}
-@keyframes arriveGlow{
-  0%,100%{text-shadow:0 0 10px rgba(255,180,84,.7),0 0 26px rgba(255,120,60,.35)}
-  50%{text-shadow:0 0 16px rgba(255,190,100,1),0 0 44px rgba(255,120,60,.7)}
-}
-
-/* 伞图标：穿越 C 落地收伞（下落触地 → 伞面收拢 → 手持摆动） */
-.umb{display:inline-flex;line-height:0;transform-origin:50% 90%;transition:transform .7s cubic-bezier(.55,-.15,.3,1.2)}
-.umb svg{overflow:visible}
-.umb.land svg{animation:umbBob .5s ease-out}
-@keyframes umbBob{0%{transform:translateY(-7px)}62%{transform:translateY(1px)}100%{transform:none}}
-.umb-canopy{
-  fill:var(--cyn);opacity:.92;
-  transform-box:fill-box;transform-origin:50% 100%;
-  transition:transform .7s cubic-bezier(.55,-.15,.3,1.2);
-}
-.umb-rib{fill:none;stroke:rgba(4,3,14,.45);stroke-width:1}
-.umb-shaft{fill:none;stroke:var(--ink);stroke-width:1.6;stroke-linecap:round}
-.umb.folded{transform:rotate(18deg)}
-.umb.folded .umb-canopy{transform:scaleY(.14) scaleX(.9)}
-.umb.folded svg{animation:umbSway 2.6s ease-in-out infinite alternate}
-@keyframes umbSway{from{transform:rotate(-3deg)}to{transform:rotate(3deg)}}
-
-/* ===== P1：待机呼吸提示（停留 3s，按章换文案） ===== */
-#idle-hint{
-  bottom:clamp(18px,4vh,40px);left:50%;transform:translateX(-50%);
-  color:var(--dim);font-size:12px;letter-spacing:.32em;white-space:nowrap;
-  opacity:0;transition:opacity .5s;pointer-events:none;text-align:center;
-}
-#idle-hint.on{opacity:1;animation:breathe 2.4s ease-in-out infinite}
-@keyframes breathe{0%,100%{opacity:.4}50%{opacity:1}}
-
-/* ===== P1：穿越时刻视觉 ===== */
-#flash{display:none;position:fixed;inset:0;z-index:15;pointer-events:none;opacity:0;mix-blend-mode:screen}
-#flash.cool{
-  background:radial-gradient(120% 100% at 50% 62%,rgba(120,240,255,.5),rgba(255,45,149,.28) 60%,transparent);
-  animation:flashFade .45s ease-out;
-}
-#flash.warm{
-  background:radial-gradient(120% 100% at 50% 62%,rgba(255,190,90,.55),rgba(255,120,60,.3) 60%,transparent);
-  animation:flashFade .45s ease-out;
-}
-@keyframes flashFade{0%{opacity:0}18%{opacity:1}100%{opacity:0}}
-#stage.shake{animation:shakeX .15s linear}
-#stage.neon-pulse{animation:neonPulse .55s ease-out}
-#stage.shake.neon-pulse{animation:shakeX .15s linear,neonPulse .55s ease-out}
-@keyframes shakeX{
-  0%,100%{transform:translate(0,0)}
-  20%{transform:translate(2px,-1px)}
-  40%{transform:translate(-2px,1px)}
-  60%{transform:translate(1px,2px)}
-  80%{transform:translate(-1px,-2px)}
-}
-@keyframes neonPulse{0%{filter:none}30%{filter:saturate(1.8) contrast(1.05)}100%{filter:none}}
-
-/* ===== P1：静音钮（M 键共享状态） ===== */
-#mute-btn{
-  margin-left:10px;background:rgba(12,8,30,.55);border:1px solid rgba(38,230,255,.35);
-  color:var(--ink);border-radius:999px;padding:8px 13px;font:inherit;font-size:12px;
-  letter-spacing:.14em;cursor:pointer;backdrop-filter:blur(4px);
-  transition:border-color .25s,color .25s;
-}
-#mute-btn::before{content:"♪ ";color:var(--cyn)}
-#mute-btn:hover{border-color:var(--cyn);box-shadow:0 0 12px rgba(38,230,255,.3)}
-#mute-btn.muted{color:var(--dim);border-color:rgba(233,230,247,.2)}
-#mute-btn.muted::before{color:rgba(233,230,247,.35);text-decoration:line-through}
-
-/* ===== 窄屏自适应（≤720px：标题上移避开 HUD/提示，hero 压缩不碰撞） ===== */
-@media (max-width:720px){
-  #titles{
-    top:9vh;bottom:auto;left:16px;right:76px;width:auto;
-    align-content:start;transform:none;
-  }
-  .ch-title{justify-content:flex-start}
-  .ch-line{font-size:clamp(19px,6vw,28px)}
-  .ch-title{gap:8px}
-  .hero .ch-line{line-height:1.2;font-size:clamp(24px,6.8vw,36px)}
-  .hero .ch-sub{font-size:11px;line-height:1.75;max-width:34ch}
-  .hero-meta{
-    margin:22px 0 0;font-family:var(--mono,monospace);font-size:10px;letter-spacing:.22em;
-    color:var(--dim,var(--mut,#9aa3b8));padding-top:14px;
-    border-top:1px solid rgba(255,90,180,.16);max-width:44ch;
-  }
-  #rail .track{height:24vh}
-  #keys{display:none}
-  .brand b{font-size:12px;letter-spacing:.3em}
-  .brand span{font-size:9px;letter-spacing:.4em}
-  .nav-btn{padding:7px 8px;font-size:12px;letter-spacing:.18em}
-  #tour-btn{margin-left:6px;padding:7px 10px;font-size:11px;letter-spacing:.12em}
-  #mute-btn{margin-left:6px;padding:7px 10px;font-size:11px}
-  #topbar{padding:12px 14px}
-  #hint{font-size:10px;letter-spacing:.22em}
-  #hud{
-    left:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));
-    min-width:0;padding:7px 10px 8px;border-radius:6px;
-  }
-  .hud-big{font-size:24px}
-  .hud-loc{font-size:15px}
-  .hud-sub{font-size:10px;margin-top:4px}
-  .hud-sub b{font-size:12px}
-  .hud-row{margin-top:5px;gap:8px}
-  .flip{width:44px;height:30px}
-  .flip-face{font-size:13px}
-  #hud-arrive{font-size:11px;letter-spacing:.14em;margin-top:6px}
-  #idle-hint{font-size:10px;letter-spacing:.22em}
-}
-
-/* ===== prefers-reduced-motion：静态模式（P1：无微震无动画，HUD 淡切） ===== */
-@media (prefers-reduced-motion: reduce){
-  #hint .chev{animation:none}
-  body.reduced .ch-title{transition:opacity .2s}
-  .ui{transition:opacity .2s}
-  .nav-btn::after{transition:none}
-  .hud-ch.in{animation:none;transition:opacity .25s}
-  .hud-ch.roll-out{animation:none}
-  .flip-inner{transition:none}
-  .umb,.umb-canopy{transition:none}
-  .umb svg,.umb.folded svg,.umb.land svg{animation:none}
-  #stage.shake,#stage.neon-pulse,#stage.shake.neon-pulse{animation:none}
-  #flash{display:none}
-  #idle-hint.on{animation:none;opacity:.75}
-  #hud.spd .hud-big,#hud.spd .hud-loc b{filter:none}
-  #hud-arrive.lit{animation:none}
-}
-
-  /* 主题加载屏 */
-  #preloader{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:18px;background:#0a0618;transition:opacity .8s ease,visibility .8s}
-  #preloader.done{opacity:0;visibility:hidden;pointer-events:none}
-  #preloader .pl-anim{width:48px;height:48px;position:relative}
-  #preloader .pl-anim.star::before,#preloader .pl-anim.star::after{content:'';position:absolute;left:50%;top:50%;width:3px;height:3px;border-radius:50%;background:#ff5fa8;box-shadow:0 0 10px rgba(255,95,168,.3);animation:pl-star 2s ease-in-out infinite}
-  #preloader .pl-anim.star::after{animation-delay:1s}
-  @keyframes pl-star{0%,100%{transform:translate(-50%,-50%) scale(0);opacity:0}50%{transform:translate(-50%,-50%) scale(3);opacity:1}}
-  #preloader .pl-anim.glow{width:52px;height:52px;border-radius:50%;background:radial-gradient(circle,rgba(255,95,168,.3) 0%,transparent 70%);animation:pl-glow 2.4s ease-in-out infinite}
-  @keyframes pl-glow{0%,100%{transform:scale(.6);opacity:.3}50%{transform:scale(1.2);opacity:1}}
-  #preloader .pl-anim.rain{width:2px;height:36px;background:linear-gradient(180deg,transparent,#ff5fa8);animation:pl-rain 1.2s ease-in infinite;border-radius:2px}
-  @keyframes pl-rain{0%{transform:translateY(-20px);opacity:0}30%{opacity:1}100%{transform:translateY(24px);opacity:0}}
-  #preloader .pl-title{font-family:var(--mono,monospace);font-size:12px;letter-spacing:.5em;color:#ff5fa8;opacity:.8}
-  #preloader .pl-sub{font-family:var(--mono,monospace);font-size:9px;letter-spacing:.3em;color:rgba(255,255,255,.3);animation:pl-sub-pulse 2s ease-in-out infinite}
-  @keyframes pl-sub-pulse{0%,100%{opacity:.2}50%{opacity:.6}}
-  @media(prefers-reduced-motion:reduce){#preloader .pl-anim,#preloader .pl-sub{animation:none}}
-
-  @media(min-width:769px){#mtv{display:none!important}}
 </style>
 </head>
 <body>
-  <div id="preloader" aria-hidden="true"><div class="pl-anim rain"></div><div class="pl-title">NEON DRIFT</div><div class="pl-sub">CITY SIGNAL</div></div>
 
-<div id="spacer" aria-hidden="true"></div>
+<div id="preloader">
+  <div class="pl-anim rain"></div>
+  <div class="pl-title">NEON DRIFT</div>
+  <div class="pl-sub">CITY SIGNAL</div>
+  <div class="pl-bar"><i id="pl-fill"></i></div>
+</div>
 
-<!-- 固定铺满视口的画面层（v3 视频优先：视频 = 画面唯一来源；
-     海报 = 首屏第一印象 / 失败兜底 / 静态模式关键帧；无 canvas、无程序渲染） -->
-<div id="stage" role="img" aria-label="NEON DRIFT 雨夜漫游：镜头穿云俯冲落向雨夜街面，再沉入地下市场的心跳">
-  <img id="poster" src="assets/keys2/k1.png" alt="" aria-hidden="true">
-    <!-- 移动端漫游专用 video（桌面端隐藏） -->
-  <video id="mtv" muted playsinline preload="none" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .5s ease;z-index:2;pointer-events:none" aria-hidden="true"></video>
-  <video id="vid1" muted playsinline preload="none" aria-hidden="true"></video>
-  <video id="vid2" muted playsinline preload="none" aria-hidden="true"></video>
-  <video id="vid3" muted playsinline preload="none" aria-hidden="true"></video>
-  <!-- 静态模式章节切换过场 -->
-  <div id="loading" data-pct="0%" aria-hidden="true"></div>
-  <div id="fade" aria-hidden="true"></div>
+<div id="stage">
+  <img class="poster" id="poster" src="assets/keys2/k1.png" alt="" aria-hidden="true">
+  <video id="vprev" muted playsinline preload="none"></video>
+  <video id="vcurr" muted playsinline preload="auto"></video>
+  <video id="vnext" muted playsinline preload="none"></video>
+  <div class="stage-fade" id="fade"></div>
 </div>
 
 <header id="topbar" class="ui">
-  <div class="brand"><b>NEON DRIFT</b><span>雨夜漫游</span></div>
-  <nav aria-label="章节导航">
-    <button class="nav-btn active" type="button">高空</button>
-    <button class="nav-btn" type="button">街面</button>
-    <button class="nav-btn" type="button">地下</button>
-    <button id="tour-btn" type="button">▶ 自动漫游</button>
-    <button id="mute-btn" type="button" aria-pressed="false" title="声音开关（M）"><span id="mute-txt">音效</span></button>
-  </nav>
+  <div id="brand">NEON DRIFT<span>雨夜漫游</span></div>
+  <nav id="nav"></nav>
 </header>
 
-<div id="titles" class="ui" aria-live="polite">
-  <!-- 首屏 hero：kicker + 大标题 + 副标 + 元信息，0% 即完整可见，滚动后随节奏淡出 -->
-  <div class="ch-title hero" id="title-0">
-    <span class="ch-num">NEON DRIFT · 雨夜漫游</span>
-    <h2 class="ch-line">这场雨，从四百米高空<br>落进城市心底。</h2>
-    <span class="ch-sub">滚动即下落——穿过云层、坠入楼隙、沉进地下的暖光。一次滚动，一段坠落；停下，雨也为你停。</span>
-    <p class="hero-meta">三章 · 海拔 480 M · 自动漫游见右下 · 建议开启声音</p>
-  </div>
-  <div class="ch-title" id="title-1">
-    <span class="ch-num">CH.02 · 街面</span>
-    <h2 class="ch-line">「霓虹之下，人流如数据。」</h2>
-    <span class="ch-sub">STREET — NEON PARADE</span>
-  </div>
-  <div class="ch-title" id="title-2">
-    <span class="ch-num">CH.03 · 地下</span>
-    <h2 class="ch-line">「再往下，是城市的心跳。」</h2>
-    <span class="ch-sub">UNDERGROUND — CITY HEARTBEAT</span>
-  </div>
-</div>
+<div id="chapter-title"></div>
+<div id="hud"></div>
+<div id="rail"><div class="track"><div class="fill" id="rail-fill"></div></div><div class="pct" id="pct">000</div></div>
+<div id="hint">滚动 · 坠落下一段</div>
+<button id="tour-btn" type="button">▶ 自动漫游</button>
 
-<div id="rail" class="ui" aria-hidden="true">
-  <span class="cap" id="pct">0%</span>
-  <div class="track">
-    <div id="rail-fill"></div>
-    <i class="tick" style="top:33.3%"></i>
-    <i class="tick" style="top:66.6%"></i>
-  </div>
-  <span class="cap">100%</span>
-</div>
+<script>
+/* ================================================================
+   V5 简洁引擎：章节制滚动叙事
+   核心交互：滚动/滑动 = 跳转章节；视频正常播放（不 seek）
+   预加载：当前段播放时加载下一段
+   ================================================================ */
+(function() {
+'use strict';
 
-<!-- ===== P1 反馈层：计量 HUD（海拔计 / 街道定位+伞+门牌+步数 / 楼层翻牌+温度+距离倒数+抵达） ===== -->
-<div id="hud" class="ui" aria-live="off">
-  <div class="hud-ch active in" id="hud-seg1">
-    <div class="hud-label">ALT · 海拔</div>
-    <div class="hud-big"><span id="hud-alt">480.0</span><span class="hud-unit">m</span></div>
-    <div class="hud-sub">垂直速度 <b id="hud-vs">0.0</b> m/s <span class="vs">↓</span></div>
-  </div>
-  <div class="hud-ch" id="hud-seg2">
-    <div class="hud-label">LOC · 街道定位</div>
-    <div class="hud-loc">中山路 · 路口<b id="hud-door">07</b></div>
-    <div class="hud-sub">
-      <span class="umb" id="umb" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="20" height="20">
-          <g class="umb-canopy">
-            <path d="M12 2.5C6.7 2.5 2.5 6.6 2.5 11h19c0-4.4-4.2-8.5-9.5-8.5z"/>
-            <path class="umb-rib" d="M12 2.5V11M7 3.4L6 11M17 3.4L18 11"/>
-          </g>
-          <path class="umb-shaft" d="M12 11v8a1.9 1.9 0 0 0 3.8 0"/>
-        </svg>
-      </span>
-      步数 <b id="hud-steps">0</b>
-    </div>
-  </div>
-  <div class="hud-ch" id="hud-seg3">
-    <div class="hud-label">DIST · 距核心面档</div>
-    <div class="hud-big"><span id="hud-dist">12.0</span><span class="hud-unit">m</span></div>
-    <div class="hud-row">
-      <span class="flip" id="hud-floor" aria-label="楼层 B1"><span class="flip-inner"><span class="flip-face front">B1</span><span class="flip-face back">B2</span></span></span>
-      <span class="hud-temp" id="hud-temp">地表 12°</span>
-    </div>
-    <div id="hud-arrive">已抵达 · 城市的心跳</div>
-  </div>
-</div>
+var CONFIG = {
+  "chapters": [
+    {
+      "nav": "高空",
+      "kicker": "CHAPTER 01 · SKYFALL",
+      "title": "雨落下来，城市才醒。",
+      "sub": "滚动即下落——穿过云层、坠入楼隙。",
+      "poster": "assets/keys2/k1.png",
+      "video": "assets/seg1-scrub.mp4",
+      "hud": {
+        "label": "ALTITUDE",
+        "start": 480.0,
+        "end": 30.0,
+        "unit": "m",
+        "sub": "垂直速度 88m/s"
+      }
+    },
+    {
+      "nav": "街面",
+      "kicker": "CHAPTER 02 · STREET",
+      "title": "霓虹之下，人流如数据。",
+      "sub": "湿漉路面反射品红与青色霓虹。",
+      "poster": "assets/keys2/k2.png",
+      "video": "assets/seg2-scrub.mp4",
+      "hud": {
+        "label": "STREET NO.",
+        "start": 7,
+        "end": 19,
+        "unit": "",
+        "sub": "中山路"
+      }
+    },
+    {
+      "nav": "地下",
+      "kicker": "CHAPTER 03 · UNDERGROUND",
+      "title": "再往下，是城市的心跳。",
+      "sub": "穿过地面开口，沉进地下的暖光。",
+      "poster": "assets/keys2/k4.png",
+      "video": "assets/seg3-scrub.mp4",
+      "hud": {
+        "label": "DISTANCE",
+        "start": 12.0,
+        "end": 0.0,
+        "unit": "m",
+        "sub": "距面档"
+      }
+    }
+  ],
+  "titleDuration": 4500
+};
 
-<!-- P1：穿越时刻色温 flash（微震/脉冲作用于 #stage，见 CSS） -->
-<div id="flash" aria-hidden="true"></div>
+var doc = document, win = window;
+var st = {
+  chapter: 0,           // 当前章节
+  playing: false,        // 当前视频是否在播
+  touring: false,        // 自动漫游中
+  transitioning: false,  // 章节切换中
+  hintGone: false,
+};
 
-<!-- P1：待机呼吸提示（停留 3s，文案按章变化） -->
-<div id="idle-hint" class="ui" aria-hidden="true">继续下落 ↓</div>
+/* ---------- DOM ---------- */
+var poster = doc.getElementById('poster');
+var vprev = doc.getElementById('vprev');
+var vcurr = doc.getElementById('vcurr');
+var vnext = doc.getElementById('vnext');
+var fadeEl = doc.getElementById('fade');
+var preloader = doc.getElementById('preloader');
+var plFill = doc.getElementById('pl-fill');
+var hintEl = doc.getElementById('hint');
+var tourBtn = doc.getElementById('tour-btn');
+var titleEl = doc.getElementById('chapter-title');
+var hudEl = doc.getElementById('hud');
+var railFill = doc.getElementById('rail-fill');
+var pctEl = doc.getElementById('pct');
+var navEl = doc.getElementById('nav');
 
-<div id="hint" class="ui">
-  <span>向下滚动 · 开始雨夜漫游</span>
-  <span class="chev"></span>
-</div>
+/* ---------- 章节导航 ---------- */
+for (var ni = 0; ni < CONFIG.chapters.length; ni++) {
+  (function(i) {
+    var btn = doc.createElement('button');
+    btn.textContent = CONFIG.chapters[i].nav;
+    btn.addEventListener('click', function() { goTo(i); });
+    navEl.appendChild(btn);
+  })(ni);
+}
+var navBtns = Array.prototype.slice.call(navEl.children);
 
-<div id="keys" class="ui">
-  <kbd>空格</kbd>漫游 <kbd>M</kbd>静音 <kbd>H</kbd>隐藏界面 <kbd>↑</kbd><kbd>↓</kbd>滚动
-</div>
+/* ---------- 视频 ---------- */
+function videoFor(chIdx) { return chIdx === st.chapter ? vcurr : (chIdx === st.chapter - 1 ? vprev : vnext); }
 
-<noscript>
-  <style>#stage{background:#04030c url(assets/keys2/k1.png) center/cover no-repeat}
-  /* 主题加载屏 */
-  #preloader{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:18px;background:#0a0618;transition:opacity .8s ease,visibility .8s}
-  #preloader.done{opacity:0;visibility:hidden;pointer-events:none}
-  #preloader .pl-anim{width:48px;height:48px;position:relative}
-  #preloader .pl-anim.star::before,#preloader .pl-anim.star::after{content:'';position:absolute;left:50%;top:50%;width:3px;height:3px;border-radius:50%;background:#ff5fa8;box-shadow:0 0 10px rgba(255,95,168,.3);animation:pl-star 2s ease-in-out infinite}
-  #preloader .pl-anim.star::after{animation-delay:1s}
-  @keyframes pl-star{0%,100%{transform:translate(-50%,-50%) scale(0);opacity:0}50%{transform:translate(-50%,-50%) scale(3);opacity:1}}
-  #preloader .pl-anim.glow{width:52px;height:52px;border-radius:50%;background:radial-gradient(circle,rgba(255,95,168,.3) 0%,transparent 70%);animation:pl-glow 2.4s ease-in-out infinite}
-  @keyframes pl-glow{0%,100%{transform:scale(.6);opacity:.3}50%{transform:scale(1.2);opacity:1}}
-  #preloader .pl-anim.rain{width:2px;height:36px;background:linear-gradient(180deg,transparent,#ff5fa8);animation:pl-rain 1.2s ease-in infinite;border-radius:2px}
-  @keyframes pl-rain{0%{transform:translateY(-20px);opacity:0}30%{opacity:1}100%{transform:translateY(24px);opacity:0}}
-  #preloader .pl-title{font-family:var(--mono,monospace);font-size:12px;letter-spacing:.5em;color:#ff5fa8;opacity:.8}
-  #preloader .pl-sub{font-family:var(--mono,monospace);font-size:9px;letter-spacing:.3em;color:rgba(255,255,255,.3);animation:pl-sub-pulse 2s ease-in-out infinite}
-  @keyframes pl-sub-pulse{0%,100%{opacity:.2}50%{opacity:.6}}
-  @media(prefers-reduced-motion:reduce){#preloader .pl-anim,#preloader .pl-sub{animation:none}}
+function loadVideo(el, src, onProgress) {
+  return new Promise(function(resolve, reject) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', src, true);
+    xhr.responseType = 'blob';
+    xhr.onprogress = function(e) {
+      if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
+    };
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        el.src = URL.createObjectURL(xhr.response);
+        el.load();
+        el.addEventListener('canplaythrough', function h() {
+          el.removeEventListener('canplaythrough', h);
+          resolve();
+        }, { once: true });
+        // 兜底：3 秒后即使未 canplaythrough 也 resolve
+        setTimeout(resolve, 3000);
+      } else reject();
+    };
+    xhr.onerror = reject;
+    xhr.send();
+  });
+}
 
-  @media(min-width:769px){#mtv{display:none!important}}
-</style>
-  <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#04030c;color:#e9e6f7;z-index:99;text-align:center;padding:24px">
-    本页面需要启用 JavaScript 才能呈现雨夜漫游场景。
-  </div>
-</noscript>
+/* ---------- 章节切换 ---------- */
+function goTo(idx) {
+  if (st.transitioning || idx < 0 || idx >= CONFIG.chapters.length || idx === st.chapter) return;
+  userInterrupt();
+  st.transitioning = true;
+  var ch = CONFIG.chapters[idx];
+  var prevIdx = st.chapter;
+  st.chapter = idx;
 
-<script src="audio.js?v=3"></script>
-<script src="feedback.js?v=3"></script>
-<script src="neon-video.js?v=3"></script>
-<script src="app.js?v=3"></script>
-<script>setTimeout(function(){var p=document.getElementById('preloader');if(p)p.classList.add('done')},8000)</script>
-<script>if(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)||innerWidth<768){setTimeout(function(){var p=document.getElementById('preloader');if(p)p.classList.add('done');var l=document.getElementById('loading');if(l)l.style.display='none'},1500)}</script>
+  /* 视觉切换：fade out → 换源 → fade in */
+  fadeEl.classList.add('on');
+
+  setTimeout(function() {
+    /* 更新海报兜底 */
+    poster.src = ch.poster;
+    poster.style.opacity = 0;  // 视频播时隐藏
+
+    /* 更新标题 */
+    showTitle(idx);
+
+    /* 更新 HUD */
+    updateHUD(idx, 0);
+
+    /* 更新导航 */
+    navBtns.forEach(function(b, i) { b.classList.toggle('active', i === idx); });
+
+    /* 加载并播放视频 */
+    var target = (idx > prevIdx) ? vnext : vprev;  // 方向决定用哪个 video 元素
+    target.src = ch.video;
+    target.style.opacity = 1;
+    target.currentTime = 0;
+    target.muted = false;
+    target.play().then(function() {
+      /* 播放成功 */
+      fadeEl.classList.remove('on');
+      st.transitioning = false;
+      st.playing = true;
+
+      /* 预加载下一段 */
+      preloadNext(idx);
+
+      /* 结尾自动待机（非漫游时停在最后帧） */
+      target.onended = function() {
+        st.playing = false;
+        if (st.touring) {
+          /* 漫游模式：自动进下一段 */
+          if (idx + 1 < CONFIG.chapters.length) {
+            goTo(idx + 1);
+          } else {
+            stopTour();
+          }
+        }
+        /* 非漫游：停在最后帧等待下一次输入 */
+      };
+    }).catch(function() {
+      /* 自动播放被拒：静音重试 */
+      target.muted = true;
+      target.play().then(function() {
+        fadeEl.classList.remove('on');
+        st.transitioning = false;
+        st.playing = true;
+        preloadNext(idx);
+      }).catch(function() {
+        /* 彻底失败：显示海报 */
+        poster.style.opacity = 1;
+        fadeEl.classList.remove('on');
+        st.transitioning = false;
+      });
+    });
+
+    /* 隐藏旧视频 */
+    var old = (idx > prevIdx) ? vprev : vnext;
+    old.style.opacity = 0;
+    old.pause();
+  }, 400);
+}
+
+/* ---------- 预加载下一段 ---------- */
+function preloadNext(idx) {
+  var next = idx + 1;
+  if (next >= CONFIG.chapters.length) return;
+  var el = vnext;
+  if (el.src !== CONFIG.chapters[next].video && !el.src.includes(CONFIG.chapters[next].video.split('/').pop())) {
+    el.src = CONFIG.chapters[next].video;
+    el.preload = 'auto';
+    el.load();
+  }
+}
+
+/* ---------- 标题 ---------- */
+function showTitle(idx) {
+  var ch = CONFIG.chapters[idx];
+  titleEl.innerHTML = '<div class="t-kicker">' + ch.kicker + '</div>' +
+    '<div class="t-main">' + ch.title + '</div>' +
+    (ch.sub ? '<div class="t-sub">' + ch.sub + '</div>' : '');
+  titleEl.className = 'fade-in';
+  clearTimeout(showTitle._t);
+  showTitle._t = setTimeout(function() {
+    titleEl.className = 'fade-out';
+  }, CONFIG.titleDuration || 4000);
+}
+
+/* ---------- HUD ---------- */
+function updateHUD(idx, progress) {
+  var ch = CONFIG.chapters[idx];
+  if (!ch.hud) return;
+  var val = ch.hud.start + (ch.hud.end - ch.hud.start) * progress;
+  hudEl.innerHTML = '<div class="hud-cap">' + ch.hud.label + '</div>' +
+    '<div><span class="hud-big">' + val.toFixed(1) + '</span><span class="hud-unit">' + ch.hud.unit + '</span></div>' +
+    (ch.hud.sub ? '<div class="hud-sub">' + ch.hud.sub + '</div>' : '');
+}
+
+/* ---------- 进度条 ---------- */
+function updateRail() {
+  var chProgress = st.playing ? (vcurr.currentTime / (vcurr.duration || 6)) : 0;
+  var total = (st.chapter + chProgress) / CONFIG.chapters.length;
+  var pct = Math.round(total * 100);
+  railFill.style.height = pct + '%';
+  pctEl.textContent = (pct < 10 ? '00' : pct < 100 ? '0' : '') + pct;
+}
+
+/* ---------- 漫游 ---------- */
+function startTour() {
+  if (st.touring) { stopTour(); return; }
+  st.touring = true;
+  tourBtn.textContent = '❚❚ 暂停漫游';
+  dismissHint();
+  if (st.chapter === 0 && !st.playing) {
+    goTo(0);  // 从头开始（goTo 会跳过相同章节，所以特殊处理第一章）
+    playCurrent();
+  }
+  // goTo 内的 onended 会自动链到下一段
+}
+function stopTour() {
+  st.touring = false;
+  tourBtn.textContent = '▶ 自动漫游';
+}
+function playCurrent() {
+  vcurr.muted = false;
+  vcurr.play().catch(function() { vcurr.muted = true; vcurr.play().catch(function(){}); });
+  st.playing = true;
+  vcurr.onended = function() {
+    st.playing = false;
+    if (st.touring) {
+      if (st.chapter + 1 < CONFIG.chapters.length) goTo(st.chapter + 1);
+      else stopTour();
+    }
+  };
+}
+
+/* ---------- 输入处理 ---------- */
+var wheelAccum = 0, wheelTimer = 0;
+win.addEventListener('wheel', function(e) {
+  e.preventDefault();
+  userInterrupt();
+  wheelAccum += e.deltaY;
+  clearTimeout(wheelTimer);
+  wheelTimer = setTimeout(function() { wheelAccum = 0; }, 200);
+  if (Math.abs(wheelAccum) > 60) {
+    var dir = wheelAccum > 0 ? 1 : -1;
+    wheelAccum = 0;
+    goTo(st.chapter + dir);
+  }
+}, { passive: false });
+
+/* 触摸滑动 */
+var touchY = 0, touchTime = 0;
+win.addEventListener('touchstart', function(e) {
+  touchY = e.touches[0].clientY;
+  touchTime = Date.now();
+  userInterrupt();
+}, { passive: true });
+win.addEventListener('touchend', function(e) {
+  var dy = touchY - e.changedTouches[0].clientY;
+  var dt = Date.now() - touchTime;
+  if (Math.abs(dy) > 40 && dt < 500) {
+    goTo(st.chapter + (dy > 0 ? 1 : -1));
+  }
+}, { passive: true });
+
+/* 键盘 */
+win.addEventListener('keydown', function(e) {
+  if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); userInterrupt(); goTo(st.chapter + 1); }
+  else if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); userInterrupt(); goTo(st.chapter - 1); }
+  else if (e.key === ' ') { e.preventDefault(); startTour(); }
+  else if (e.key === 'h' || e.key === 'H' || e.key === 'Escape') {
+    doc.querySelectorAll('.ui, #hud, #rail, #hint, #tour-btn, #chapter-title').forEach(function(el) {
+      el.style.visibility = el.style.visibility === 'hidden' ? '' : 'hidden';
+    });
+  }
+});
+
+function userInterrupt() {
+  if (st.touring) stopTour();
+  dismissHint();
+}
+function dismissHint() {
+  if (st.hintGone) return;
+  st.hintGone = true;
+  hintEl.classList.add('gone');
+}
+
+tourBtn.addEventListener('click', function() { tourBtn.blur(); startTour(); });
+
+/* ---------- 主循环（轻量：只更新 HUD 和进度条） ---------- */
+var rafId = 0, running = true;
+function frame() {
+  if (!running) return;
+  rafId = requestAnimationFrame(frame);
+  if (st.playing && vcurr.duration > 0) {
+    var chProgress = vcurr.currentTime / vcurr.duration;
+    updateHUD(st.chapter, chProgress);
+  }
+  updateRail();
+}
+frame();
+doc.addEventListener('visibilitychange', function() {
+  if (doc.hidden) { running = false; cancelAnimationFrame(rafId); }
+  else if (!running) { running = true; frame(); }
+});
+
+/* ---------- 初始化 ---------- */
+function init() {
+  /* 加载第一段视频（带进度） */
+  var ch1 = CONFIG.chapters[0];
+  loadVideo(vcurr, ch1.video, function(p) {
+    plFill.style.width = Math.round(p * 100) + '%';
+  }).then(function() {
+    preloader.classList.add('done');
+    poster.src = ch1.poster;
+    showTitle(0);
+    updateHUD(0, 0);
+    navBtns[0].classList.add('active');
+
+    /* 预加载第二段 */
+    if (CONFIG.chapters[1]) {
+      vnext.src = CONFIG.chapters[1].video;
+      vnext.preload = 'auto';
+      vnext.load();
+    }
+
+    /* 自动开始播放第一段 */
+    playCurrent();
+    vcurr.style.opacity = 1;
+  }).catch(function() {
+    /* 加载失败：显示海报，等待用户交互 */
+    preloader.classList.add('done');
+    poster.style.opacity = 1;
+    showTitle(0);
+    navBtns[0].classList.add('active');
+  });
+}
+init();
+
+})();
+</script>
 </body>
 </html>
